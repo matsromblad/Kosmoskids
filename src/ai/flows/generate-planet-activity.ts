@@ -11,7 +11,7 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
-export const GeneratePlanetActivityInputSchema = z.object({
+const GeneratePlanetActivityInputSchema = z.object({
   planetName: z.string().describe('The name of the planet being visited.'),
   planetDescription: z.string().describe('A short description of the planet.'),
   characterName: z.string().describe('The name of the space character.'),
@@ -22,7 +22,7 @@ export const GeneratePlanetActivityInputSchema = z.object({
 });
 export type GeneratePlanetActivityInput = z.infer<typeof GeneratePlanetActivityInputSchema>;
 
-export const GeneratePlanetActivityOutputSchema = z.object({
+const GeneratePlanetActivityOutputSchema = z.object({
   activityText: z.string().describe("En kort (2-4 meningar), rolig och barnvänlig berättelse på svenska om vad rymdvarelsen {{{characterName}}} gör på planeten {{{planetName}}}. Anpassa berättelsen till karaktärens stil och bakgrund, samt planetens egenskaper."),
   imagePrompt: z.string().describe("En detaljerad prompt för att generera en bild som illustrerar aktiviteten. Bilden ska vara i en glad, färgstark och barnvänlig tecknad stil, och visa {{{characterName}}} på {{{planetName}}}. Inkludera detaljer från berättelsen."),
 });

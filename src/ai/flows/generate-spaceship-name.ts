@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Generates a unique and witty name for a spaceship.
@@ -10,7 +11,7 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
-export const GenerateSpaceshipNameInputSchema = z.object({
+const GenerateSpaceshipNameInputSchema = z.object({
   spaceshipStyle: z.string().describe('The chosen style for the spaceship, e.g., Snabb kurir, Tungt lastfartyg.'),
   wingName: z.string().describe('The name of the selected wings.'),
   engineName: z.string().describe('The name of the selected engine.'),
@@ -18,7 +19,7 @@ export const GenerateSpaceshipNameInputSchema = z.object({
 });
 export type GenerateSpaceshipNameInput = z.infer<typeof GenerateSpaceshipNameInputSchema>;
 
-export const GenerateSpaceshipNameOutputSchema = z.object({
+const GenerateSpaceshipNameOutputSchema = z.object({
   spaceshipName: z.string().describe('A witty and cool name for the spaceship, written in Swedish.'),
 });
 export type GenerateSpaceshipNameOutput = z.infer<typeof GenerateSpaceshipNameOutputSchema>;
