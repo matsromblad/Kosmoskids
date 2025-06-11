@@ -220,6 +220,8 @@ export default function AnpassaSkeppPage() {
       let desc = "Kunde inte generera skeppsnamn. Försöker skapa skepp med ett standardnamn.";
        if (error.message && (error.message.includes("503") || error.message.toLowerCase().includes("overloaded"))) {
         desc = "AI-tjänsten för att skapa namn är upptagen. Försöker skapa skepp med ett standardnamn.";
+      } else if (error.message && error.message.toLowerCase().includes("quota")) {
+        desc = "AI-tjänsten har nått sin kvot för idag. Försöker skapa skepp med ett standardnamn.";
       }
       toast({ title: "Fel vid Namngenerering", description: desc, variant: "default" });
       currentSpaceshipName = "Rymdraketen"; 
@@ -243,6 +245,8 @@ export default function AnpassaSkeppPage() {
       let desc = "Kunde inte generera skeppshistoria. Skapar skepp utan historia.";
        if (error.message && (error.message.includes("503") || error.message.toLowerCase().includes("overloaded"))) {
         desc = "AI-tjänsten för att skapa historier är upptagen. Skapar skepp utan historia.";
+      } else if (error.message && error.message.toLowerCase().includes("quota")) {
+        desc = "AI-tjänsten har nått sin kvot för idag. Skapar skepp utan historia.";
       }
       toast({ title: "Fel vid Historiegenerering", description: desc, variant: "default" });
     } finally {
@@ -386,23 +390,23 @@ export default function AnpassaSkeppPage() {
                 )}
               </CardContent>
             </Card>
+          </div>
+
+          <div className="lg:col-span-2">
             { (spaceshipBackstory || isLoadingSpaceshipBackstory) && 
-              <Card className="w-full max-w-md shadow-xl bg-card/80 backdrop-blur-sm mt-6">
+              <Card className="w-full shadow-xl bg-card/80 backdrop-blur-sm mb-6">
                 <CardHeader>
                   <CardTitle className="text-xl font-headline text-accent flex items-center gap-2"><Wand2 /> Skeppets Historia</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {isLoadingSpaceshipBackstory ? <LoadingSpinner size="md"/> : (
-                    <ScrollArea className="h-24 p-3 border rounded-md bg-muted/50 text-sm text-foreground">
+                    <ScrollArea className="h-auto max-h-40 p-3 border rounded-md bg-muted/50 text-sm text-foreground">
                       <p>{spaceshipBackstory}</p>
                     </ScrollArea>
                   )}
                 </CardContent>
               </Card>
             }
-          </div>
-
-          <div className="lg:col-span-2">
             <Card className="w-full shadow-xl bg-card/80 backdrop-blur-sm mb-6">
               <CardHeader>
                 <CardTitle className="text-xl font-headline text-accent flex items-center gap-2"><Wand2 /> Skeppets Stil</CardTitle>

@@ -376,23 +376,23 @@ export default function AnpassaVarelsePage() {
                 )}
               </CardContent>
             </Card>
-            { (backstory || isLoadingBackstory) &&
-              <Card className="w-full max-w-sm shadow-xl bg-card/80 backdrop-blur-sm mt-6">
+          </div>
+
+          <div className="lg:col-span-2">
+             { (backstory || isLoadingBackstory) &&
+              <Card className="w-full shadow-xl bg-card/80 backdrop-blur-sm mb-6">
                 <CardHeader>
                   <CardTitle className="text-xl font-headline text-accent flex items-center gap-2"><Wand2 /> Bakgrundshistoria</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {isLoadingBackstory ? <LoadingSpinner size="md"/> : (
-                    <ScrollArea className="h-32 p-3 border rounded-md bg-muted/50 text-sm text-foreground">
+                    <ScrollArea className="h-auto max-h-40 p-3 border rounded-md bg-muted/50 text-sm text-foreground">
                       <p>{backstory}</p>
                     </ScrollArea>
                   )}
                 </CardContent>
               </Card>
             }
-          </div>
-
-          <div className="lg:col-span-2">
             <Card className="w-full shadow-xl bg-card/80 backdrop-blur-sm mb-6">
               <CardHeader>
                 <CardTitle className="text-xl font-headline text-accent flex items-center gap-2">
