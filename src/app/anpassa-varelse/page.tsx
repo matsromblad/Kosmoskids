@@ -2,15 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { Shirt, Sparkles, Puzzle, Wand2, ChevronDown } from 'lucide-react';
+import { Shirt, Sparkles, Puzzle, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { GameHeader } from '@/components/layout/GameHeader';
 import { OptionCard } from '@/components/game/OptionCard';
 import { generateCharacterBackstory, type GenerateCharacterBackstoryInput } from '@/ai/flows/generate-backstory';
+import { generateImage, type GenerateImageInput } from '@/ai/flows/generate-image-flow';
 import { useToast } from "@/hooks/use-toast";
 import { LoadingSpinner } from '@/components/game/LoadingSpinner';
 
@@ -19,19 +20,20 @@ interface CustomizationOption {
   name: string;
   imageUrl: string;
   imageHint: string;
+  isLoadingImage?: boolean;
 }
 
-const clothingOptions: CustomizationOption[] = [
+const initialClothingOptions: CustomizationOption[] = [
   { id: 'suit1', name: 'Rymddräkt Alfa', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'space suit' },
   { id: 'suit2', name: 'Glittrig Overall', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'sparkly overall' },
   { id: 'vest1', name: 'Skyddsväst Beta', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'protective vest' },
 ];
-const hairstyleOptions: CustomizationOption[] = [
+const initialHairstyleOptions: CustomizationOption[] = [
   { id: 'hair1', name: 'Antenner', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'alien antennae' },
   { id: 'hair2', name: 'Blått Spikigt Hår', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'blue spiky hair' },
   { id: 'hair3', name: 'Lysande Tentakler', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'glowing tentacles' },
 ];
-const accessoryOptions: CustomizationOption[] = [
+const initialAccessoryOptions: CustomizationOption[] = [
   { id: 'acc1', name: 'Jetpack X', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'jetpack toy' },
   { id: 'acc2', name: 'Rymdhjälm Pro', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'space helmet' },
   { id: 'acc3', name: 'Stjärn-glasögon', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'star sunglasses' },
@@ -46,8 +48,8 @@ const characterStyles = [
 ];
 
 export default function AnpassaVarelsePage() {
-  const [selectedClothing, setSelectedClothing] = useState<string | null>(clothingOptions[0].id);
-  const [selectedHairstyle, setSelectedHairstyle] = useState<string | null>(hairstyleOptions[0].id);
+  const [selectedClothing, setSelectedClothing] = useState<string | null>(initialClothingOptions[0].id);
+  const [selectedHairstyle, setSelectedHairstyle] = useState<string | null>(initialHairstyleOptions[0].id);
   const [selectedAccessory, setSelectedAccessory] = useState<string | null>(null);
   
   const [selectedCharacterStyle, setSelectedCharacterStyle] = useState<string>(characterStyles[0].value);
@@ -55,14 +57,47 @@ export default function AnpassaVarelsePage() {
   const [isLoadingBackstory, setIsLoadingBackstory] = useState(false);
   const { toast } = useToast();
 
-  // Client-side check for Math.random or Date
+  const [clothingOptions, setClothingOptions] = useState<CustomizationOption[]>(initialClothingOptions.map(opt => ({...opt, isLoadingImage: opt.imageUrl.startsWith('https://placehold.co')})));
+  const [hairstyleOptions, setHairstyleOptions] = useState<CustomizationOption[]>(initialHairstyleOptions.map(opt => ({...opt, isLoadingImage: opt.imageUrl.startsWith('https://placehold.co')})));
+  const [accessoryOptions, setAccessoryOptions] = useState<CustomizationOption[]>(initialAccessoryOptions.map(opt => ({...opt, isLoadingImage: opt.imageUrl.startsWith('https://placehold.co')})));
+  
   const [characterImageUrl, setCharacterImageUrl] = useState('https://placehold.co/300x400.png');
+  const [isLoadingMainCharacterImage, setIsLoadingMainCharacterImage] = useState(true);
+
   useEffect(() => {
-    // Example: update image based on selections (simplified)
-    // This ensures any dynamic URL generation based on selections happens client-side
-    const seed = (selectedClothing?.length || 0) + (selectedHairstyle?.length || 0) + (selectedAccessory?.length || 0);
-    setCharacterImageUrl(`https://placehold.co/300x400.png?seed=${seed}`);
-  }, [selectedClothing, selectedHairstyle, selectedAccessory]);
+    const fetchOptionImages = async (options: CustomizationOption[], setOptionsState: React.Dispatch<React.SetStateAction<CustomizationOption[]>>) => {
+      const updatedOptions = await Promise.all(options.map(async (opt) => {
+        if (opt.imageUrl.startsWith('https://placehold.co')) {
+          try {
+            const result = await generateImage({ prompt: opt.imageHint });
+            return { ...opt, imageUrl: result.imageDataUri, isLoadingImage: false };
+          } catch (error) {
+            console.error(`Failed to generate image for ${opt.name}:`, error);
+            return { ...opt, isLoadingImage: false }; 
+          }
+        }
+        return { ...opt, isLoadingImage: false };
+      }));
+      setOptionsState(updatedOptions);
+    };
+
+    fetchOptionImages(clothingOptions, setClothingOptions);
+    fetchOptionImages(hairstyleOptions, setHairstyleOptions);
+    fetchOptionImages(accessoryOptions, setAccessoryOptions);
+
+    const generateInitialCharacterImage = async () => {
+      setIsLoadingMainCharacterImage(true);
+      try {
+        const result = await generateImage({ prompt: "alien character" }); 
+        setCharacterImageUrl(result.imageDataUri);
+      } catch (error) {
+        console.error("Failed to generate main character image:", error);
+      } finally {
+        setIsLoadingMainCharacterImage(false);
+      }
+    };
+    generateInitialCharacterImage();
+  }, []);
 
 
   const handleGenerateBackstory = async () => {
@@ -95,7 +130,7 @@ export default function AnpassaVarelsePage() {
         <OptionCard
           key={opt.id}
           name={opt.name}
-          imageUrl={opt.imageUrl}
+          imageUrl={opt.isLoadingImage ? 'https://placehold.co/100x100.png' : opt.imageUrl}
           imageHint={opt.imageHint}
           isSelected={selected === opt.id}
           onSelect={() => setSelected(opt.id)}
@@ -109,18 +144,20 @@ export default function AnpassaVarelsePage() {
       <GameHeader title="Anpassa din Rymdvarelse" />
       <main className="flex-grow container mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Character Display */}
           <div className="lg:col-span-1 flex flex-col items-center">
             <Card className="w-full max-w-sm shadow-xl bg-card/80 backdrop-blur-sm">
               <CardHeader>
                 <CardTitle className="text-center text-2xl font-headline text-primary">Din Varelse</CardTitle>
               </CardHeader>
-              <CardContent className="flex justify-center p-6">
-                <Image src={characterImageUrl} alt="Rymdvarelse" width={300} height={400} className="rounded-lg object-cover shadow-lg border-2 border-primary" data-ai-hint="alien character" />
+              <CardContent className="flex justify-center items-center p-6 min-h-[400px]">
+                {isLoadingMainCharacterImage ? (
+                   <LoadingSpinner size="lg"/>
+                ) : (
+                  <Image src={characterImageUrl} alt="Rymdvarelse" width={300} height={400} className="rounded-lg object-cover shadow-lg border-2 border-primary" data-ai-hint="alien character" />
+                )}
               </CardContent>
             </Card>
             
-            {/* AI Backstory Section */}
             <Card className="w-full max-w-sm mt-6 shadow-xl bg-card/80 backdrop-blur-sm">
               <CardHeader>
                 <CardTitle className="text-xl font-headline text-accent flex items-center gap-2"><Wand2 /> Bakgrundshistoria</CardTitle>
@@ -151,7 +188,6 @@ export default function AnpassaVarelsePage() {
             </Card>
           </div>
 
-          {/* Customization Options */}
           <div className="lg:col-span-2">
             <Tabs defaultValue="clothes" className="w-full">
               <TabsList className="grid w-full grid-cols-3 bg-primary/20">

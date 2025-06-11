@@ -1,8 +1,10 @@
 "use client";
 
+import { useState, useEffect } from 'react';
 import { GameHeader } from '@/components/layout/GameHeader';
 import { PlanetCard } from '@/components/game/PlanetCard';
-import { Flame, Snowflake, Gem, Factory } from 'lucide-react'; // Using Factory for Rymdstation
+import { Flame, Snowflake, Gem, Factory } from 'lucide-react';
+import { generateImage, type GenerateImageInput } from '@/ai/flows/generate-image-flow';
 
 interface PlanetInfo {
   id: string;
@@ -12,9 +14,10 @@ interface PlanetInfo {
   imageHint: string;
   icon: React.ElementType; // LucideIcon
   themeColor: string;
+  isLoadingImage?: boolean;
 }
 
-const planets: PlanetInfo[] = [
+const initialPlanets: PlanetInfo[] = [
   {
     id: 'lavaplaneten',
     name: 'Lavaplaneten Volcanis',
@@ -54,6 +57,30 @@ const planets: PlanetInfo[] = [
 ];
 
 export default function RymdkartaPage() {
+  const [planets, setPlanets] = useState<PlanetInfo[]>(initialPlanets.map(p => ({...p, isLoadingImage: p.imageUrl.startsWith('https://placehold.co')})));
+
+  useEffect(() => {
+    const fetchPlanetImages = async () => {
+      const updatedPlanets = await Promise.all(
+        planets.map(async (planet) => {
+          if (planet.imageUrl.startsWith('https://placehold.co')) {
+            try {
+              const result = await generateImage({ prompt: planet.imageHint });
+              return { ...planet, imageUrl: result.imageDataUri, isLoadingImage: false };
+            } catch (error) {
+              console.error(`Failed to generate image for ${planet.name}:`, error);
+              return { ...planet, isLoadingImage: false }; // Keep placeholder
+            }
+          }
+          return { ...planet, isLoadingImage: false };
+        })
+      );
+      setPlanets(updatedPlanets);
+    };
+
+    fetchPlanetImages();
+  }, []); // Run once on mount
+
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-background to-indigo-900/50">
       <GameHeader title="Utforska Rymden" />
@@ -68,10 +95,11 @@ export default function RymdkartaPage() {
               planetId={planet.id}
               name={planet.name}
               description={planet.description}
-              imageUrl={planet.imageUrl}
+              imageUrl={planet.isLoadingImage ? 'https://placehold.co/300x200.png' : planet.imageUrl}
               imageHint={planet.imageHint}
               icon={planet.icon}
               themeColor={planet.themeColor}
+              isLoadingImage={planet.isLoadingImage}
             />
           ))}
         </div>
