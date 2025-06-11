@@ -42,6 +42,8 @@ const LOGO_STORAGE_KEY = "kosmoskids_logo";
 const ACTIVE_PLANET_IDS_KEY = "kosmoskids_active_planet_ids";
 const PLANET_IMAGES_KEY = "kosmoskids_planet_images";
 const VISITED_PLANETS_KEY = "kosmoskids_visited_planets";
+const CHARACTER_CUSTOMIZATION_OPTIONS_KEY_V1 = "KOSMOSKIDS_CHARACTER_CUSTOMIZATION_OPTIONS_V1";
+const SPACESHIP_CUSTOMIZATION_OPTIONS_KEY_V1 = "KOSMOSKIDS_SPACESHIP_CUSTOMIZATION_OPTIONS_V1";
 
 
 export default function Home() {
@@ -80,7 +82,13 @@ export default function Home() {
       generateImage({ prompt: "planet logo space kids game vibrant colors" })
         .then(result => {
           setLogoImageUrl(result.imageDataUri);
-          localStorage.setItem(LOGO_STORAGE_KEY, result.imageDataUri);
+          try {
+            localStorage.setItem(LOGO_STORAGE_KEY, result.imageDataUri);
+          } catch (e: any) {
+            // If logo saving fails due to quota, it's not critical.
+            // The app will try to regenerate next time or use placeholder.
+            console.warn("Could not save logo to localStorage, likely due to quota", e.message);
+          }
         })
         .catch(error => {
           console.error("Failed to generate logo image:", error);
@@ -95,19 +103,26 @@ export default function Home() {
   const handleStartOver = () => {
     localStorage.removeItem(CHARACTER_STORAGE_KEY);
     localStorage.removeItem(SPACESHIP_STORAGE_KEY);
-    localStorage.removeItem(LOGO_STORAGE_KEY); // Also clear logo to allow regeneration if desired
+    localStorage.removeItem(LOGO_STORAGE_KEY); 
     localStorage.removeItem(ACTIVE_PLANET_IDS_KEY);
     localStorage.removeItem(PLANET_IMAGES_KEY);
     localStorage.removeItem(VISITED_PLANETS_KEY);
+    localStorage.removeItem(CHARACTER_CUSTOMIZATION_OPTIONS_KEY_V1);
+    localStorage.removeItem(SPACESHIP_CUSTOMIZATION_OPTIONS_KEY_V1);
+
 
     setCharacterData(null);
     setSpaceshipData(null);
-    setLogoImageUrl(null); // Clear logo from state so it attempts to reload/regenerate
-    setIsLoadingLogo(true); // Trigger loading state for logo
-     generateImage({ prompt: "planet logo space kids game vibrant colors" }) // Re-trigger logo generation
+    setLogoImageUrl(null); 
+    setIsLoadingLogo(true); 
+     generateImage({ prompt: "planet logo space kids game vibrant colors" }) 
         .then(result => {
           setLogoImageUrl(result.imageDataUri);
-          localStorage.setItem(LOGO_STORAGE_KEY, result.imageDataUri);
+           try {
+            localStorage.setItem(LOGO_STORAGE_KEY, result.imageDataUri);
+          } catch (e: any) {
+            console.warn("Could not save regenerated logo to localStorage, likely due to quota", e.message);
+          }
         })
         .catch(error => {
           console.error("Failed to generate logo image:", error);
@@ -119,7 +134,7 @@ export default function Home() {
 
     toast({
       title: "Spelet Återställt!",
-      description: "Din varelse, skepp och utforskningsframsteg har nollställts. Nya planeter väntar!",
+      description: "Din varelse, skepp och utforskningsframsteg har nollställts. Nya planeter och anpassningsalternativ väntar!",
       variant: "default"
     });
   };
@@ -143,7 +158,7 @@ export default function Home() {
                   className="rounded-full object-contain"
                   data-ai-hint="planet logo"
               />
-            ) : ( // Fallback if logoImageUrl is null AND not loading (e.g. initial state before useEffect)
+            ) : ( 
               <Image
                 src="https://placehold.co/200x200/2E3192/FFFFFF.png?text=Kosmos"
                 alt="Kosmoskids Logotyp Placeholder"
@@ -194,7 +209,6 @@ export default function Home() {
           <TooltipProvider delayDuration={100}>
             <Tooltip>
               <TooltipTrigger asChild>
-                {/* The div wrapper is necessary for TooltipTrigger asChild when the child might be complex or disabled */}
                 <div className={cn("rounded-lg", !canExplore && "opacity-60 cursor-not-allowed grayscale-[50%]")}>
                    <MainMenuButton
                     href="/rymdkarta" 
@@ -229,5 +243,4 @@ export default function Home() {
     </div>
   );
 }
-
     

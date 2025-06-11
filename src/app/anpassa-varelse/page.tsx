@@ -16,6 +16,7 @@ import { generateCharacterBackstory, type GenerateCharacterBackstoryInput } from
 import { generateImage, type GenerateImageInput } from '@/ai/flows/generate-image-flow';
 import { useToast } from "@/hooks/use-toast";
 import { LoadingSpinner } from '@/components/game/LoadingSpinner';
+import { getRandomUniqueElements } from '@/lib/utils';
 
 interface CustomizationOption {
   id: string;
@@ -35,22 +36,35 @@ interface StoredCharacter {
 const CHARACTER_STORAGE_KEY = "kosmoskids_character";
 const LOGO_STORAGE_KEY = "kosmoskids_logo";
 const PLANET_IMAGES_KEY = "kosmoskids_planet_images";
+const CHARACTER_CUSTOMIZATION_OPTIONS_KEY_V1 = "KOSMOSKIDS_CHARACTER_CUSTOMIZATION_OPTIONS_V1";
 
-
-const initialClothingOptions: CustomizationOption[] = [
+// Global pools of all possible options
+const allClothingOptionsGlobal: CustomizationOption[] = [
   { id: 'suit1', name: 'Rymddräkt Alfa' },
   { id: 'suit2', name: 'Glittrig Overall' },
   { id: 'vest1', name: 'Skyddsväst Beta' },
+  { id: 'robe1', name: 'Stjärnmantel' },
+  { id: 'armor1', name: 'Lätt Exo-Skelett' },
+  { id: 'jumpsuit1', name: 'Pilotoverall GX' },
+  { id: 'cloak1', name: 'Mystisk Kåpa' },
 ];
-const initialHairstyleOptions: CustomizationOption[] = [
+const allHairstyleOptionsGlobal: CustomizationOption[] = [
   { id: 'hair1', name: 'Antenner' },
   { id: 'hair2', name: 'Blått Spikigt Hår' },
   { id: 'hair3', name: 'Lysande Tentakler' },
+  { id: 'hair4', name: 'Kristallkam' },
+  { id: 'hair5', name: 'Plasmaflätor' },
+  { id: 'hair6', name: 'Metallisk Irokés' },
+  { id: 'hair7', name: 'Virvlande Gasnimbus' },
 ];
-const initialAccessoryOptions: CustomizationOption[] = [
+const allAccessoryOptionsGlobal: CustomizationOption[] = [
   { id: 'acc1', name: 'Jetpack X' },
   { id: 'acc2', name: 'Rymdhjälm Pro' },
   { id: 'acc3', name: 'Stjärn-glasögon' },
+  { id: 'acc4', name: 'Energisköld Mini' },
+  { id: 'acc5', name: 'Universalöversättare' },
+  { id: 'acc6', name: 'Sensorvisir' },
+  { id: 'acc7', name: 'Hovrande Drönare' },
 ];
 
 const characterStyles = [
@@ -79,12 +93,60 @@ export default function AnpassaVarelsePage() {
   const [isLoadingName, setIsLoadingName] = useState(false);
   const [characterName, setCharacterName] = useState<string | null>(null);
   
-  const [clothingOptions] = useState<CustomizationOption[]>(initialClothingOptions);
-  const [hairstyleOptions] = useState<CustomizationOption[]>(initialHairstyleOptions);
-  const [accessoryOptions] = useState<CustomizationOption[]>(initialAccessoryOptions);
+  const [clothingOptions, setClothingOptions] = useState<CustomizationOption[]>([]);
+  const [hairstyleOptions, setHairstyleOptions] = useState<CustomizationOption[]>([]);
+  const [accessoryOptions, setAccessoryOptions] = useState<CustomizationOption[]>([]);
   const [activeTab, setActiveTab] = useState<string>("clothes");
 
+  const randomizeAndStoreCharacterOptions = () => {
+    const newClothing = getRandomUniqueElements(allClothingOptionsGlobal, 3);
+    const newHairstyle = getRandomUniqueElements(allHairstyleOptionsGlobal, 3);
+    const newAccessories = getRandomUniqueElements(allAccessoryOptionsGlobal, 3);
+
+    const optionsToStore = {
+      clothing: newClothing,
+      hairstyle: newHairstyle,
+      accessories: newAccessories,
+    };
+    localStorage.setItem(CHARACTER_CUSTOMIZATION_OPTIONS_KEY_V1, JSON.stringify(optionsToStore));
+    return optionsToStore;
+  };
+
   useEffect(() => {
+    let currentClothingOpts: CustomizationOption[];
+    let currentHairstyleOpts: CustomizationOption[];
+    let currentAccessoryOpts: CustomizationOption[];
+
+    const storedOptionsRaw = localStorage.getItem(CHARACTER_CUSTOMIZATION_OPTIONS_KEY_V1);
+    if (storedOptionsRaw) {
+      try {
+        const stored = JSON.parse(storedOptionsRaw);
+        currentClothingOpts = stored.clothing || getRandomUniqueElements(allClothingOptionsGlobal, 3);
+        currentHairstyleOpts = stored.hairstyle || getRandomUniqueElements(allHairstyleOptionsGlobal, 3);
+        currentAccessoryOpts = stored.accessories || getRandomUniqueElements(allAccessoryOptionsGlobal, 3);
+         // Ensure options are not empty if localStorage had empty arrays
+        if (!currentClothingOpts.length) currentClothingOpts = getRandomUniqueElements(allClothingOptionsGlobal, 3);
+        if (!currentHairstyleOpts.length) currentHairstyleOpts = getRandomUniqueElements(allHairstyleOptionsGlobal, 3);
+        if (!currentAccessoryOpts.length) currentAccessoryOpts = getRandomUniqueElements(allAccessoryOptionsGlobal, 3);
+
+      } catch (e) {
+        console.error("Failed to parse stored character options, randomizing.", e);
+        const randomOpts = randomizeAndStoreCharacterOptions();
+        currentClothingOpts = randomOpts.clothing;
+        currentHairstyleOpts = randomOpts.hairstyle;
+        currentAccessoryOpts = randomOpts.accessories;
+      }
+    } else {
+      const randomOpts = randomizeAndStoreCharacterOptions();
+      currentClothingOpts = randomOpts.clothing;
+      currentHairstyleOpts = randomOpts.hairstyle;
+      currentAccessoryOpts = randomOpts.accessories;
+    }
+
+    setClothingOptions(currentClothingOpts);
+    setHairstyleOptions(currentHairstyleOpts);
+    setAccessoryOptions(currentAccessoryOpts);
+
     const storedCharacterRaw = localStorage.getItem(CHARACTER_STORAGE_KEY);
     if (storedCharacterRaw) {
       try {
@@ -99,12 +161,16 @@ export default function AnpassaVarelsePage() {
       } catch (e) {
         console.error("Failed to parse stored character", e);
         localStorage.removeItem(CHARACTER_STORAGE_KEY);
+        if (currentClothingOpts.length > 0) setSelectedClothing(currentClothingOpts[0].id);
+        if (currentHairstyleOpts.length > 0) setSelectedHairstyle(currentHairstyleOpts[0].id);
+        setSelectedAccessory(null);
       }
     } else {
-      // Set defaults if nothing is stored
-      setSelectedClothing(initialClothingOptions[0].id);
-      setSelectedHairstyle(initialHairstyleOptions[0].id);
+      if (currentClothingOpts.length > 0) setSelectedClothing(currentClothingOpts[0].id);
+      if (currentHairstyleOpts.length > 0) setSelectedHairstyle(currentHairstyleOpts[0].id);
+      setSelectedAccessory(null); 
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
 
@@ -160,9 +226,10 @@ export default function AnpassaVarelsePage() {
       setIsLoadingBackstory(false);
     }
 
-    const clothingNameStr = clothingOptions.find(opt => opt.id === selectedClothing)?.name || "standardklädsel";
-    const hairstyleNameStr = hairstyleOptions.find(opt => opt.id === selectedHairstyle)?.name || "standardfrisyr";
-    const accessoryNameStr = accessoryOptions.find(opt => opt.id === selectedAccessory)?.name || "inga tillbehör";
+    const clothingNameStr = clothingOptions.find(opt => opt.id === selectedClothing)?.name || allClothingOptionsGlobal.find(opt => opt.id === selectedClothing)?.name || "standardklädsel";
+    const hairstyleNameStr = hairstyleOptions.find(opt => opt.id === selectedHairstyle)?.name || allHairstyleOptionsGlobal.find(opt => opt.id === selectedHairstyle)?.name || "standardfrisyr";
+    const accessoryNameStr = accessoryOptions.find(opt => opt.id === selectedAccessory)?.name || allAccessoryOptionsGlobal.find(opt => opt.id === selectedAccessory)?.name || "inga tillbehör";
+
 
     let prompt = `Skapa en bild av en rymdvarelse vid namn ${currentName}. Varelsen är ${selectedCharacterStyle.toLowerCase()}. `;
     prompt += `Klädsel: ${clothingNameStr}. `;
@@ -206,7 +273,7 @@ export default function AnpassaVarelsePage() {
             localStorage.removeItem(LOGO_STORAGE_KEY);
             localStorage.removeItem(PLANET_IMAGES_KEY);
             
-            localStorage.setItem(CHARACTER_STORAGE_KEY, characterDataString); // Retry
+            localStorage.setItem(CHARACTER_STORAGE_KEY, characterDataString); 
             toast({
               title: "Varelse Sparad!",
               description: `${currentName} är sparad. Lite gammal data rensades för att göra plats.`,
@@ -254,13 +321,18 @@ export default function AnpassaVarelsePage() {
       });
     } finally {
       setIsLoadingMainCharacterImage(false);
-      setIsLoadingBackstory(false); // Ensure this is reset
-      setIsLoadingName(false); // Ensure this is reset
+      setIsLoadingBackstory(false); 
+      setIsLoadingName(false); 
     }
   };
 
   const renderOptionGrid = (options: CustomizationOption[], selected: string | null, setSelected: (id: string) => void, currentActiveTab: string, tabName: string) => {
-     if (currentActiveTab !== tabName && !options.some(opt => selected === opt.id)) return null;
+     // Do not force mount if the option is not selected, but still render if activeTab matches
+     // This ensures that the content for the active tab is always rendered for layout purposes.
+     // We only return null if it's not the active tab AND there's no selected item in this category for some reason.
+     // However, options should always be populated for the active tab.
+     if (currentActiveTab !== tabName && !options.some(opt => selected === opt.id) && options.length === 0) return null;
+
 
     return (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-1">
@@ -350,19 +422,19 @@ export default function AnpassaVarelsePage() {
                 <TabsContent value="clothes" forceMount={activeTab === "clothes"}>
                   <Card className="bg-card/70 backdrop-blur-sm border-0 shadow-none">
                     <CardHeader><CardTitle className="text-lg text-primary">Välj Kläder</CardTitle></CardHeader>
-                    <CardContent>{renderOptionGrid(clothingOptions, selectedClothing, setSelectedClothing, activeTab, "clothes")}</CardContent>
+                    <CardContent>{clothingOptions.length > 0 ? renderOptionGrid(clothingOptions, selectedClothing, setSelectedClothing, activeTab, "clothes") : <LoadingSpinner/> }</CardContent>
                   </Card>
                 </TabsContent>
                 <TabsContent value="hairstyles" forceMount={activeTab === "hairstyles"}>
                    <Card className="bg-card/70 backdrop-blur-sm border-0 shadow-none">
                     <CardHeader><CardTitle className="text-lg text-primary">Välj Frisyr</CardTitle></CardHeader>
-                    <CardContent>{renderOptionGrid(hairstyleOptions, selectedHairstyle, setSelectedHairstyle, activeTab, "hairstyles")}</CardContent>
+                    <CardContent>{hairstyleOptions.length > 0 ? renderOptionGrid(hairstyleOptions, selectedHairstyle, setSelectedHairstyle, activeTab, "hairstyles") : <LoadingSpinner/> }</CardContent>
                   </Card>
                 </TabsContent>
                 <TabsContent value="accessories" forceMount={activeTab === "accessories"}>
                    <Card className="bg-card/70 backdrop-blur-sm border-0 shadow-none">
                     <CardHeader><CardTitle className="text-lg text-primary">Välj Tillbehör</CardTitle></CardHeader>
-                    <CardContent>{renderOptionGrid(accessoryOptions, selectedAccessory, setSelectedAccessory, activeTab, "accessories")}</CardContent>
+                    <CardContent>{accessoryOptions.length > 0 ? renderOptionGrid(accessoryOptions, selectedAccessory, setSelectedAccessory, activeTab, "accessories") : <LoadingSpinner/> }</CardContent>
                   </Card>
                 </TabsContent>
               </ScrollArea>

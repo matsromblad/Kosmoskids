@@ -17,6 +17,7 @@ import { LoadingSpinner } from '@/components/game/LoadingSpinner';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { getRandomUniqueElements } from '@/lib/utils';
 
 interface SpaceshipPartOption {
   id: string;
@@ -33,7 +34,7 @@ interface StoredSpaceship {
     engine: string | null;
     decoration: string | null;
   };
-  partNames: {
+  partNames: { // This might be redundant if we always fetch names from current options or global options
     wingName: string;
     engineName: string;
     decorationName: string;
@@ -43,22 +44,38 @@ interface StoredSpaceship {
 const SPACESHIP_STORAGE_KEY = "kosmoskids_spaceship";
 const LOGO_STORAGE_KEY = "kosmoskids_logo";
 const PLANET_IMAGES_KEY = "kosmoskids_planet_images";
+const SPACESHIP_CUSTOMIZATION_OPTIONS_KEY_V1 = "KOSMOSKIDS_SPACESHIP_CUSTOMIZATION_OPTIONS_V1";
 
-const initialWingOptions: SpaceshipPartOption[] = [
+
+// Global pools of all possible options
+const allWingOptionsGlobal: SpaceshipPartOption[] = [
   { id: 'wing1', name: 'Snabba Vingar' },
   { id: 'wing2', name: 'Solpanels-Vingar' },
   { id: 'wing3', name: 'Mini-vingar' },
+  { id: 'wing4', name: 'Delta-vingar' },
+  { id: 'wing5', name: 'Organiska Vingar' },
+  { id: 'wing6', name: 'Fjäderlätta Vingar' },
+  { id: 'wing7', name: 'Pansarvingar' },
 ];
-const initialEngineOptions: SpaceshipPartOption[] = [
+const allEngineOptionsGlobal: SpaceshipPartOption[] = [
   { id: 'engine1', name: 'Plasma Motor' },
   { id: 'engine2', name: 'Hyperdrive X' },
   { id: 'engine3', name: 'Tyst Motor' },
+  { id: 'engine4', name: 'Jonmotor MKII' },
+  { id: 'engine5', name: 'Svart Hål-Drive (mini)' },
+  { id: 'engine6', name: 'Antimateria-reaktor' },
+  { id: 'engine7', name: 'Solsegel-Boost' },
 ];
-const initialDecorationOptions: SpaceshipPartOption[] = [
+const allDecorationOptionsGlobal: SpaceshipPartOption[] = [
   { id: 'deco1', name: 'Stjärn-klistermärken' },
   { id: 'deco2', name: 'Rymd-flammor' },
   { id: 'deco3', name: 'Kosmiska Blommor' },
+  { id: 'deco4', name: 'Graffiti-taggar' },
+  { id: 'deco5', name: 'Holografisk Projektor' },
+  { id: 'deco6', name: 'Lysande Runor' },
+  { id: 'deco7', name: 'Kameleont-färg' },
 ];
+
 
 const spaceshipStyles = [
   { value: 'Snabb kurir', label: 'Snabb kurir'},
@@ -73,9 +90,9 @@ export default function AnpassaSkeppPage() {
   const [selectedEngine, setSelectedEngine] = useState<string | null>(null);
   const [selectedDecoration, setSelectedDecoration] = useState<string | null>(null);
 
-  const [wingOptions] = useState<SpaceshipPartOption[]>(initialWingOptions);
-  const [engineOptions] = useState<SpaceshipPartOption[]>(initialEngineOptions);
-  const [decorationOptions] = useState<SpaceshipPartOption[]>(initialDecorationOptions);
+  const [wingOptions, setWingOptions] = useState<SpaceshipPartOption[]>([]);
+  const [engineOptions, setEngineOptions] = useState<SpaceshipPartOption[]>([]);
+  const [decorationOptions, setDecorationOptions] = useState<SpaceshipPartOption[]>([]);
 
   const [spaceshipName, setSpaceshipName] = useState<string | null>(null);
   const [spaceshipImageUrl, setSpaceshipImageUrl] = useState<string | null>(null);
@@ -88,7 +105,54 @@ export default function AnpassaSkeppPage() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<string>("wings");
 
+  const randomizeAndStoreSpaceshipOptions = () => {
+    const newWings = getRandomUniqueElements(allWingOptionsGlobal, 3);
+    const newEngines = getRandomUniqueElements(allEngineOptionsGlobal, 3);
+    const newDecorations = getRandomUniqueElements(allDecorationOptionsGlobal, 3);
+
+    const optionsToStore = {
+      wings: newWings,
+      engines: newEngines,
+      decorations: newDecorations,
+    };
+    localStorage.setItem(SPACESHIP_CUSTOMIZATION_OPTIONS_KEY_V1, JSON.stringify(optionsToStore));
+    return optionsToStore;
+  };
+
   useEffect(() => {
+    let currentWingOpts: SpaceshipPartOption[];
+    let currentEngineOpts: SpaceshipPartOption[];
+    let currentDecorationOpts: SpaceshipPartOption[];
+
+    const storedOptionsRaw = localStorage.getItem(SPACESHIP_CUSTOMIZATION_OPTIONS_KEY_V1);
+    if (storedOptionsRaw) {
+      try {
+        const stored = JSON.parse(storedOptionsRaw);
+        currentWingOpts = stored.wings || getRandomUniqueElements(allWingOptionsGlobal, 3);
+        currentEngineOpts = stored.engines || getRandomUniqueElements(allEngineOptionsGlobal, 3);
+        currentDecorationOpts = stored.decorations || getRandomUniqueElements(allDecorationOptionsGlobal, 3);
+        if (!currentWingOpts.length) currentWingOpts = getRandomUniqueElements(allWingOptionsGlobal, 3);
+        if (!currentEngineOpts.length) currentEngineOpts = getRandomUniqueElements(allEngineOptionsGlobal, 3);
+        if (!currentDecorationOpts.length) currentDecorationOpts = getRandomUniqueElements(allDecorationOptionsGlobal, 3);
+
+      } catch (e) {
+        console.error("Failed to parse stored spaceship options, randomizing.", e);
+        const randomOpts = randomizeAndStoreSpaceshipOptions();
+        currentWingOpts = randomOpts.wings;
+        currentEngineOpts = randomOpts.engines;
+        currentDecorationOpts = randomOpts.decorations;
+      }
+    } else {
+      const randomOpts = randomizeAndStoreSpaceshipOptions();
+      currentWingOpts = randomOpts.wings;
+      currentEngineOpts = randomOpts.engines;
+      currentDecorationOpts = randomOpts.decorations;
+    }
+    
+    setWingOptions(currentWingOpts);
+    setEngineOptions(currentEngineOpts);
+    setDecorationOptions(currentDecorationOpts);
+
     const storedSpaceshipRaw = localStorage.getItem(SPACESHIP_STORAGE_KEY);
     if (storedSpaceshipRaw) {
       try {
@@ -105,11 +169,16 @@ export default function AnpassaSkeppPage() {
       } catch (e) {
         console.error("Failed to parse stored spaceship", e);
         localStorage.removeItem(SPACESHIP_STORAGE_KEY);
+        if (currentWingOpts.length > 0) setSelectedWings(currentWingOpts[0].id);
+        if (currentEngineOpts.length > 0) setSelectedEngine(currentEngineOpts[0].id);
+        setSelectedDecoration(null);
       }
     } else {
-      setSelectedWings(initialWingOptions[0].id);
-      setSelectedEngine(initialEngineOptions[0].id);
+        if (currentWingOpts.length > 0) setSelectedWings(currentWingOpts[0].id);
+        if (currentEngineOpts.length > 0) setSelectedEngine(currentEngineOpts[0].id);
+        setSelectedDecoration(null);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleCreateSpaceship = async () => {
@@ -129,21 +198,19 @@ export default function AnpassaSkeppPage() {
     setSpaceshipName(null);
     setSpaceshipBackstory(null);
     
-
-    const wingNameStr = wingOptions.find(opt => opt.id === selectedWings)?.name || "standardvingar";
-    const engineNameStr = engineOptions.find(opt => opt.id === selectedEngine)?.name || "standardmotor";
-    const decorationNameStr = decorationOptions.find(opt => opt.id === selectedDecoration)?.name || "inga dekorationer";
-    
+    const wingNameStr = wingOptions.find(opt => opt.id === selectedWings)?.name || allWingOptionsGlobal.find(opt => opt.id === selectedWings)?.name || "standardvingar";
+    const engineNameStr = engineOptions.find(opt => opt.id === selectedEngine)?.name || allEngineOptionsGlobal.find(opt => opt.id === selectedEngine)?.name || "standardmotor";
+    const decorationNameStr = decorationOptions.find(opt => opt.id === selectedDecoration)?.name || allDecorationOptionsGlobal.find(opt => opt.id === selectedDecoration)?.name || "inga dekorationer";
+        
     let currentSpaceshipName = "";
     let generatedBackstory = "";
 
     try {
-      // Generate Name
       const nameInput: GenerateSpaceshipNameInput = {
         spaceshipStyle: selectedSpaceshipStyle,
         wingName: wingNameStr,
         engineName: engineNameStr,
-        decorationName: decorationNameStr,
+        decorationName: decorationNameStr !== "inga dekorationer" ? decorationNameStr : undefined,
       };
       const nameResult = await generateSpaceshipName(nameInput);
       currentSpaceshipName = nameResult.spaceshipName;
@@ -155,19 +222,18 @@ export default function AnpassaSkeppPage() {
         desc = "AI-tjänsten för att skapa namn är upptagen. Försöker skapa skepp med ett standardnamn.";
       }
       toast({ title: "Fel vid Namngenerering", description: desc, variant: "default" });
-      currentSpaceshipName = "Rymdraketen"; // Fallback name
+      currentSpaceshipName = "Rymdraketen"; 
       setSpaceshipName(currentSpaceshipName);
     } finally {
       setIsLoadingSpaceshipName(false);
     }
 
     try {
-      // Generate Backstory
       const backstoryInput: GenerateSpaceshipBackstoryInput = {
         spaceshipStyle: selectedSpaceshipStyle,
         wingName: wingNameStr,
         engineName: engineNameStr,
-        decorationName: decorationNameStr,
+        decorationName: decorationNameStr !== "inga dekorationer" ? decorationNameStr : undefined,
       };
       const backstoryResult = await generateSpaceshipBackstory(backstoryInput);
       generatedBackstory = backstoryResult.backstory;
@@ -183,7 +249,6 @@ export default function AnpassaSkeppPage() {
       setIsLoadingSpaceshipBackstory(false);
     }
       
-    // Generate Image
     let prompt = `Skapa en bild av ett rymdskepp vid namn "${currentSpaceshipName}".
     Vingar: ${wingNameStr}.
     Motor: ${engineNameStr}.
@@ -198,7 +263,6 @@ export default function AnpassaSkeppPage() {
       const imageResult = await generateImage({ prompt });
       setSpaceshipImageUrl(imageResult.imageDataUri);
       
-
       const spaceshipToStore: StoredSpaceship = {
         name: currentSpaceshipName,
         imageUrl: imageResult.imageDataUri,
@@ -231,7 +295,7 @@ export default function AnpassaSkeppPage() {
             localStorage.removeItem(LOGO_STORAGE_KEY);
             localStorage.removeItem(PLANET_IMAGES_KEY);
             
-            localStorage.setItem(SPACESHIP_STORAGE_KEY, spaceshipDataString); // Retry
+            localStorage.setItem(SPACESHIP_STORAGE_KEY, spaceshipDataString); 
             toast({
               title: "Skepp Sparat!",
               description: `Ditt skepp "${currentSpaceshipName}" är sparat. Lite gammal data rensades.`,
@@ -371,19 +435,19 @@ export default function AnpassaSkeppPage() {
                 <TabsContent value="wings" forceMount={activeTab === "wings"}>
                   <Card className="bg-card/70 backdrop-blur-sm border-0 shadow-none">
                     <CardHeader><CardTitle className="text-lg text-primary">Välj Vingar</CardTitle></CardHeader>
-                    <CardContent>{renderOptionGrid(wingOptions, selectedWings, setSelectedWings)}</CardContent>
+                    <CardContent>{wingOptions.length > 0 ? renderOptionGrid(wingOptions, selectedWings, setSelectedWings) : <LoadingSpinner/>}</CardContent>
                   </Card>
                 </TabsContent>
                 <TabsContent value="engines" forceMount={activeTab === "engines"}>
                   <Card className="bg-card/70 backdrop-blur-sm border-0 shadow-none">
                     <CardHeader><CardTitle className="text-lg text-primary">Välj Motor</CardTitle></CardHeader>
-                    <CardContent>{renderOptionGrid(engineOptions, selectedEngine, setSelectedEngine)}</CardContent>
+                    <CardContent>{engineOptions.length > 0 ? renderOptionGrid(engineOptions, selectedEngine, setSelectedEngine) : <LoadingSpinner/>}</CardContent>
                   </Card>
                 </TabsContent>
                 <TabsContent value="decorations" forceMount={activeTab === "decorations"}>
                   <Card className="bg-card/70 backdrop-blur-sm border-0 shadow-none">
                     <CardHeader><CardTitle className="text-lg text-primary">Välj Dekoration (Valfritt)</CardTitle></CardHeader>
-                    <CardContent>{renderOptionGrid(decorationOptions, selectedDecoration, setSelectedDecoration)}</CardContent>
+                    <CardContent>{decorationOptions.length > 0 ? renderOptionGrid(decorationOptions, selectedDecoration, setSelectedDecoration) : <LoadingSpinner/>}</CardContent>
                   </Card>
                 </TabsContent>
               </ScrollArea>
