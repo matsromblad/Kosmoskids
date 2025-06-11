@@ -112,52 +112,6 @@ export default function AnpassaSkeppPage() {
     }
   }, []);
 
-  const handleGenerateSpaceshipBackstory = async () => {
-    if (!selectedWings || !selectedEngine) {
-      toast({
-        title: "Val Saknas",
-        description: "Välj åtminstone vingar och motor innan du skapar en historia.",
-        variant: "destructive",
-      });
-      return;
-    }
-    setIsLoadingSpaceshipBackstory(true);
-    setSpaceshipBackstory(null);
-
-    const wingNameStr = wingOptions.find(opt => opt.id === selectedWings)?.name || "standardvingar";
-    const engineNameStr = engineOptions.find(opt => opt.id === selectedEngine)?.name || "standardmotor";
-    const decorationNameStr = decorationOptions.find(opt => opt.id === selectedDecoration)?.name;
-
-    try {
-      const input: GenerateSpaceshipBackstoryInput = {
-        spaceshipStyle: selectedSpaceshipStyle,
-        wingName: wingNameStr,
-        engineName: engineNameStr,
-        decorationName: decorationNameStr,
-      };
-      const result = await generateSpaceshipBackstory(input);
-      setSpaceshipBackstory(result.backstory);
-      toast({
-        title: "Skeppshistoria Skapad!",
-        description: "En unik historia för ditt skepp är klar.",
-      });
-    } catch (error: any) {
-      console.error("Error generating spaceship backstory:", error);
-      setSpaceshipBackstory("Ett fel uppstod när skeppets historia skulle skapas. Försök igen senare!");
-      let desc = "Kunde inte generera skeppshistoria. Försök igen om en liten stund.";
-      if (error.message && (error.message.includes("503") || error.message.toLowerCase().includes("overloaded"))) {
-        desc = "AI-tjänsten för att skapa historier verkar vara upptagen just nu. Prova igen om en liten stund!";
-      }
-      toast({
-        title: "Fel vid Skapande av Historia",
-        description: desc,
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoadingSpaceshipBackstory(false);
-    }
-  };
-
   const handleCreateSpaceship = async () => {
     if (!selectedWings || !selectedEngine) {
       toast({
@@ -170,17 +124,21 @@ export default function AnpassaSkeppPage() {
 
     setIsLoadingMainSpaceshipImage(true);
     setIsLoadingSpaceshipName(true); 
+    setIsLoadingSpaceshipBackstory(true);
     setSpaceshipImageUrl(null);
+    setSpaceshipName(null);
+    setSpaceshipBackstory(null);
     
 
     const wingNameStr = wingOptions.find(opt => opt.id === selectedWings)?.name || "standardvingar";
     const engineNameStr = engineOptions.find(opt => opt.id === selectedEngine)?.name || "standardmotor";
     const decorationNameStr = decorationOptions.find(opt => opt.id === selectedDecoration)?.name || "inga dekorationer";
     
-    let currentSpaceshipName = spaceshipName;
+    let currentSpaceshipName = "";
+    let generatedBackstory = "";
 
     try {
-      
+      // Generate Name
       const nameInput: GenerateSpaceshipNameInput = {
         spaceshipStyle: selectedSpaceshipStyle,
         wingName: wingNameStr,
@@ -190,19 +148,53 @@ export default function AnpassaSkeppPage() {
       const nameResult = await generateSpaceshipName(nameInput);
       currentSpaceshipName = nameResult.spaceshipName;
       setSpaceshipName(currentSpaceshipName);
-      setIsLoadingSpaceshipName(false);
-
-      
-      let prompt = `Skapa en bild av ett rymdskepp vid namn "${currentSpaceshipName}".
-      Vingar: ${wingNameStr}.
-      Motor: ${engineNameStr}.
-      Dekoration: ${decorationNameStr}.
-      Skeppets stil: ${selectedSpaceshipStyle}. `;
-      if (spaceshipBackstory) {
-        prompt += `Bakgrundshistoria: ${spaceshipBackstory}. `;
+    } catch (error: any) {
+      console.error("Error generating spaceship name:", error);
+      let desc = "Kunde inte generera skeppsnamn. Försöker skapa skepp med ett standardnamn.";
+       if (error.message && (error.message.includes("503") || error.message.toLowerCase().includes("overloaded"))) {
+        desc = "AI-tjänsten för att skapa namn är upptagen. Försöker skapa skepp med ett standardnamn.";
       }
-      prompt += `Visuell stil: Enkel, cool tecknad stil, barnvänlig, rymdtema.`;
+      toast({ title: "Fel vid Namngenerering", description: desc, variant: "default" });
+      currentSpaceshipName = "Rymdraketen"; // Fallback name
+      setSpaceshipName(currentSpaceshipName);
+    } finally {
+      setIsLoadingSpaceshipName(false);
+    }
 
+    try {
+      // Generate Backstory
+      const backstoryInput: GenerateSpaceshipBackstoryInput = {
+        spaceshipStyle: selectedSpaceshipStyle,
+        wingName: wingNameStr,
+        engineName: engineNameStr,
+        decorationName: decorationNameStr,
+      };
+      const backstoryResult = await generateSpaceshipBackstory(backstoryInput);
+      generatedBackstory = backstoryResult.backstory;
+      setSpaceshipBackstory(generatedBackstory);
+    } catch (error: any) {
+      console.error("Error generating spaceship backstory:", error);
+      let desc = "Kunde inte generera skeppshistoria. Skapar skepp utan historia.";
+       if (error.message && (error.message.includes("503") || error.message.toLowerCase().includes("overloaded"))) {
+        desc = "AI-tjänsten för att skapa historier är upptagen. Skapar skepp utan historia.";
+      }
+      toast({ title: "Fel vid Historiegenerering", description: desc, variant: "default" });
+    } finally {
+      setIsLoadingSpaceshipBackstory(false);
+    }
+      
+    // Generate Image
+    let prompt = `Skapa en bild av ett rymdskepp vid namn "${currentSpaceshipName}".
+    Vingar: ${wingNameStr}.
+    Motor: ${engineNameStr}.
+    Dekoration: ${decorationNameStr}.
+    Skeppets stil: ${selectedSpaceshipStyle}. `;
+    if (generatedBackstory) {
+      prompt += `Bakgrundshistoria: ${generatedBackstory}. `;
+    }
+    prompt += `Visuell stil: Enkel, cool tecknad stil, barnvänlig, rymdtema.`;
+
+    try {
       const imageResult = await generateImage({ prompt });
       setSpaceshipImageUrl(imageResult.imageDataUri);
       
@@ -210,7 +202,7 @@ export default function AnpassaSkeppPage() {
       const spaceshipToStore: StoredSpaceship = {
         name: currentSpaceshipName,
         imageUrl: imageResult.imageDataUri,
-        backstory: spaceshipBackstory,
+        backstory: generatedBackstory,
         style: selectedSpaceshipStyle,
         parts: {
           wing: selectedWings,
@@ -274,21 +266,20 @@ export default function AnpassaSkeppPage() {
 
 
     } catch (error: any) {
-      console.error("Failed to generate spaceship name or image:", error);
-      let desc = "Kunde inte skapa namn eller bild för skeppet. Försök igen om en liten stund.";
+      console.error("Failed to generate spaceship image:", error);
+      let desc = "Kunde inte skapa bild för skeppet. Försök igen om en liten stund.";
       if (error.message && (error.message.includes("503") || error.message.toLowerCase().includes("overloaded"))) {
-        desc = "AI-tjänsten för att skapa skepp verkar vara upptagen just nu. Prova igen om en liten stund!";
+        desc = "AI-tjänsten för att skapa skeppsbilder verkar vara upptagen just nu. Prova igen om en liten stund!";
       } else if (error.message && error.message.toLowerCase().includes("quota")) {
         desc = "AI-tjänsten har nått sin kvot för idag. Prova igen imorgon!";
       }
       toast({
-        title: "Fel vid Skeppsskapande",
+        title: "Fel vid Bildgenerering",
         description: desc,
         variant: "destructive",
       });
     } finally {
       setIsLoadingMainSpaceshipImage(false);
-      setIsLoadingSpaceshipName(false);
     }
   };
 
@@ -310,7 +301,7 @@ export default function AnpassaSkeppPage() {
       <GameHeader title="Bygg ditt Rymdskepp" />
       <main className="flex-grow container mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-1 flex justify-center">
+          <div className="lg:col-span-1 flex flex-col items-center">
             <Card className="w-full max-w-md shadow-xl bg-card/80 backdrop-blur-sm">
               <CardHeader>
                 <CardTitle className="text-center text-2xl font-headline text-primary flex items-center justify-center">
@@ -331,16 +322,30 @@ export default function AnpassaSkeppPage() {
                 )}
               </CardContent>
             </Card>
+            { (spaceshipBackstory || isLoadingSpaceshipBackstory) && 
+              <Card className="w-full max-w-md shadow-xl bg-card/80 backdrop-blur-sm mt-6">
+                <CardHeader>
+                  <CardTitle className="text-xl font-headline text-accent flex items-center gap-2"><Wand2 /> Skeppets Historia</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {isLoadingSpaceshipBackstory ? <LoadingSpinner size="md"/> : (
+                    <ScrollArea className="h-24 p-3 border rounded-md bg-muted/50 text-sm text-foreground">
+                      <p>{spaceshipBackstory}</p>
+                    </ScrollArea>
+                  )}
+                </CardContent>
+              </Card>
+            }
           </div>
 
           <div className="lg:col-span-2">
             <Card className="w-full shadow-xl bg-card/80 backdrop-blur-sm mb-6">
               <CardHeader>
-                <CardTitle className="text-xl font-headline text-accent flex items-center gap-2"><Wand2 /> Skeppets Historia</CardTitle>
+                <CardTitle className="text-xl font-headline text-accent flex items-center gap-2"><Wand2 /> Skeppets Stil</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <label htmlFor="spaceshipStyle" className="block text-sm font-medium text-muted-foreground mb-1">Välj stil för skeppets historia & namn:</label>
+                  <label htmlFor="spaceshipStyle" className="block text-sm font-medium text-muted-foreground mb-1">Välj stil för skeppets namn & historia:</label>
                   <Select value={selectedSpaceshipStyle} onValueChange={setSelectedSpaceshipStyle}>
                     <SelectTrigger id="spaceshipStyle" className="w-full bg-input/50 border-border text-foreground">
                       <SelectValue placeholder="Välj en stil" />
@@ -351,20 +356,8 @@ export default function AnpassaSkeppPage() {
                       ))}
                     </SelectContent>
                   </Select>
+                   <p className="text-xs text-muted-foreground mt-1">Detta påverkar skeppets namn och historia.</p>
                 </div>
-                <Button 
-                  onClick={handleGenerateSpaceshipBackstory} 
-                  disabled={isLoadingSpaceshipBackstory || !selectedWings || !selectedEngine} 
-                  className="w-full font-semibold" 
-                  variant="secondary"
-                >
-                  {isLoadingSpaceshipBackstory ? <LoadingSpinner size="sm" /> : 'Skapa Historia för Skeppet'}
-                </Button>
-                {spaceshipBackstory && (
-                  <ScrollArea className="h-24 mt-2 p-3 border rounded-md bg-muted/50 text-sm text-foreground">
-                    <p>{spaceshipBackstory}</p>
-                  </ScrollArea>
-                )}
               </CardContent>
             </Card>
 
@@ -389,7 +382,7 @@ export default function AnpassaSkeppPage() {
                 </TabsContent>
                 <TabsContent value="decorations" forceMount={activeTab === "decorations"}>
                   <Card className="bg-card/70 backdrop-blur-sm border-0 shadow-none">
-                    <CardHeader><CardTitle className="text-lg text-primary">Välj Dekoration</CardTitle></CardHeader>
+                    <CardHeader><CardTitle className="text-lg text-primary">Välj Dekoration (Valfritt)</CardTitle></CardHeader>
                     <CardContent>{renderOptionGrid(decorationOptions, selectedDecoration, setSelectedDecoration)}</CardContent>
                   </Card>
                 </TabsContent>
@@ -402,7 +395,7 @@ export default function AnpassaSkeppPage() {
                 className="w-full font-semibold" 
                 size="lg"
               >
-                {(isLoadingMainSpaceshipImage || isLoadingSpaceshipName) ? <LoadingSpinner size="sm" /> : 'Skapa Skepp'}
+                {(isLoadingMainSpaceshipImage || isLoadingSpaceshipName || isLoadingSpaceshipBackstory) ? <LoadingSpinner size="sm" /> : 'Skapa Skepp'}
               </Button>
               <Button asChild variant="outline" size="lg" className="w-full font-semibold">
                 <Link href="/">
@@ -417,4 +410,3 @@ export default function AnpassaSkeppPage() {
     </div>
   );
 }
-

@@ -76,6 +76,7 @@ export default function AnpassaVarelsePage() {
 
   const [characterImageUrl, setCharacterImageUrl] = useState<string | null>(null);
   const [isLoadingMainCharacterImage, setIsLoadingMainCharacterImage] = useState(false);
+  const [isLoadingName, setIsLoadingName] = useState(false);
   const [characterName, setCharacterName] = useState<string | null>(null);
   
   const [clothingOptions] = useState<CustomizationOption[]>(initialClothingOptions);
@@ -108,8 +109,6 @@ export default function AnpassaVarelsePage() {
 
 
   const generateAndSetCharacterName = (): string => {
-    if (characterName) return characterName; // Don't generate if already exists
-
     const randomPrefix = spacePrefixes[Math.floor(Math.random() * spacePrefixes.length)];
     const randomDaughterName = daughterNames[Math.floor(Math.random() * daughterNames.length)];
     const newName = `${randomPrefix}${randomDaughterName}`;
@@ -117,37 +116,7 @@ export default function AnpassaVarelsePage() {
     return newName;
   };
 
-  const handleGenerateBackstory = async () => {
-    setIsLoadingBackstory(true);
-    setBackstory(null);
-    
-    const currentName = generateAndSetCharacterName(); 
-
-    try {
-      const input: GenerateCharacterBackstoryInput = { 
-        characterName: currentName, 
-        characterStyle: selectedCharacterStyle 
-      };
-      const result = await generateCharacterBackstory(input);
-      setBackstory(result.backstory);
-      toast({
-        title: "Bakgrundshistoria Skapad!",
-        description: `${currentName}s unika historia är klar.`,
-      });
-    } catch (error) {
-      console.error("Error generating backstory:", error);
-      setBackstory("Ett fel uppstod när bakgrundshistoria skulle skapas. Försök igen senare!");
-      toast({
-        title: "Fel",
-        description: "Kunde inte generera bakgrundshistoria.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoadingBackstory(false);
-    }
-  };
-
-  const handleCreateCharacterImage = async () => {
+  const handleCreateCharacter = async () => {
     if (!selectedClothing || !selectedHairstyle) {
       toast({
         title: "Val Saknas",
@@ -158,15 +127,38 @@ export default function AnpassaVarelsePage() {
     }
     
     setIsLoadingMainCharacterImage(true);
+    setIsLoadingBackstory(true);
+    setIsLoadingName(true);
     setCharacterImageUrl(null);
+    setBackstory(null);
 
-    const currentName = characterName || generateAndSetCharacterName(); 
-    if (!currentName) { 
-        toast({ title: "Namn saknas", description: "Kunde inte skapa ett namn.", variant: "destructive" });
-        setIsLoadingMainCharacterImage(false);
-        return;
+    let currentName = characterName;
+    if (!currentName) {
+      currentName = generateAndSetCharacterName();
     }
+    setCharacterName(currentName);
+    setIsLoadingName(false);
 
+
+    let generatedBackstory = "";
+    try {
+      const backstoryInput: GenerateCharacterBackstoryInput = { 
+        characterName: currentName, 
+        characterStyle: selectedCharacterStyle 
+      };
+      const backstoryResult = await generateCharacterBackstory(backstoryInput);
+      generatedBackstory = backstoryResult.backstory;
+      setBackstory(generatedBackstory);
+    } catch (error) {
+      console.error("Error generating backstory:", error);
+      toast({
+        title: "Fel vid Skapande av Historia",
+        description: "Kunde inte generera bakgrundshistoria. Försöker skapa varelse utan.",
+        variant: "default",
+      });
+    } finally {
+      setIsLoadingBackstory(false);
+    }
 
     const clothingNameStr = clothingOptions.find(opt => opt.id === selectedClothing)?.name || "standardklädsel";
     const hairstyleNameStr = hairstyleOptions.find(opt => opt.id === selectedHairstyle)?.name || "standardfrisyr";
@@ -176,19 +168,19 @@ export default function AnpassaVarelsePage() {
     prompt += `Klädsel: ${clothingNameStr}. `;
     prompt += `Frisyr: ${hairstyleNameStr}. `;
     prompt += `Tillbehör: ${accessoryNameStr}. `;
-    if (backstory) {
-      prompt += `Bakgrundshistoria: ${backstory}. `;
+    if (generatedBackstory) {
+      prompt += `Bakgrundshistoria: ${generatedBackstory}. `;
     }
     prompt += `Stil: Enkel, söt tecknad stil, glad och barnvänlig, rymdtema.`;
 
     try {
-      const result = await generateImage({ prompt }); 
-      setCharacterImageUrl(result.imageDataUri);
+      const imageResult = await generateImage({ prompt }); 
+      setCharacterImageUrl(imageResult.imageDataUri);
             
       const characterToStore: StoredCharacter = {
         name: currentName,
-        imageUrl: result.imageDataUri,
-        backstory: backstory || "",
+        imageUrl: imageResult.imageDataUri,
+        backstory: generatedBackstory,
         style: selectedCharacterStyle,
         clothing: selectedClothing,
         hairstyle: selectedHairstyle,
@@ -200,7 +192,7 @@ export default function AnpassaVarelsePage() {
         localStorage.setItem(CHARACTER_STORAGE_KEY, characterDataString);
         toast({
           title: "Varelse Skapad & Sparad!",
-          description: `Här är ${currentName}! Den är sparad lokalt.`,
+          description: `Här är ${currentName}! Hen är sparad lokalt.`,
         });
       } catch (e: any) {
         if (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
@@ -247,15 +239,23 @@ export default function AnpassaVarelsePage() {
         }
       }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to generate main character image:", error);
+      let desc = "Kunde inte skapa bild för varelsen. Försök igen om en liten stund.";
+      if (error.message && (error.message.includes("503") || error.message.toLowerCase().includes("overloaded"))) {
+        desc = "AI-tjänsten för att skapa bilder verkar vara upptagen just nu. Prova igen om en liten stund!";
+      } else if (error.message && error.message.toLowerCase().includes("quota")) {
+        desc = "AI-tjänsten har nått sin kvot för idag. Prova igen imorgon!";
+      }
       toast({
         title: "Fel vid bildgenerering",
-        description: "Kunde inte skapa bild för varelsen.",
+        description: desc,
         variant: "destructive",
       });
     } finally {
       setIsLoadingMainCharacterImage(false);
+      setIsLoadingBackstory(false); // Ensure this is reset
+      setIsLoadingName(false); // Ensure this is reset
     }
   };
 
@@ -284,11 +284,11 @@ export default function AnpassaVarelsePage() {
           <div className="lg:col-span-1 flex flex-col items-center">
             <Card className="w-full max-w-sm shadow-xl bg-card/80 backdrop-blur-sm">
               <CardHeader>
-                <CardTitle className="text-center text-2xl font-headline text-primary">
-                  {characterName ? characterName : 'Din Varelse'}
+                <CardTitle className="text-center text-2xl font-headline text-primary flex items-center justify-center">
+                  {isLoadingName ? <LoadingSpinner size="sm"/> : (characterName || "Din Varelse")}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="flex flex-col justify-center items-center p-6 min-h-[400px]">
+              <CardContent className="flex flex-col justify-center items-center p-6 min-h-[300px]">
                 {isLoadingMainCharacterImage ? (
                    <LoadingSpinner size="lg"/>
                 ) : characterImageUrl ? (
@@ -296,21 +296,35 @@ export default function AnpassaVarelsePage() {
                 ) : (
                   <div className="text-center text-muted-foreground p-4">
                     <RocketIcon className="h-16 w-16 mx-auto mb-4 text-primary/50" />
-                    <p>Gör dina val, skapa en historia och klicka sedan på "Skapa Varelse"!</p>
+                    <p>Gör dina val och klicka sedan på "Skapa Rymdvarelse"!</p>
                   </div>
                 )}
               </CardContent>
             </Card>
+            { (backstory || isLoadingBackstory) &&
+              <Card className="w-full max-w-sm shadow-xl bg-card/80 backdrop-blur-sm mt-6">
+                <CardHeader>
+                  <CardTitle className="text-xl font-headline text-accent flex items-center gap-2"><Wand2 /> Bakgrundshistoria</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {isLoadingBackstory ? <LoadingSpinner size="md"/> : (
+                    <ScrollArea className="h-32 p-3 border rounded-md bg-muted/50 text-sm text-foreground">
+                      <p>{backstory}</p>
+                    </ScrollArea>
+                  )}
+                </CardContent>
+              </Card>
+            }
           </div>
 
           <div className="lg:col-span-2">
              <Card className="w-full shadow-xl bg-card/80 backdrop-blur-sm mb-6">
               <CardHeader>
-                <CardTitle className="text-xl font-headline text-accent flex items-center gap-2"><Wand2 /> Bakgrundshistoria &amp; Namn</CardTitle>
+                <CardTitle className="text-xl font-headline text-accent flex items-center gap-2"><Wand2 /> Stil för Historia & Namn</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <label htmlFor="characterStyle" className="block text-sm font-medium text-muted-foreground mb-1">Välj stil för historia:</label>
+                  <label htmlFor="characterStyle" className="block text-sm font-medium text-muted-foreground mb-1">Välj stil för din varelse:</label>
                   <Select value={selectedCharacterStyle} onValueChange={setSelectedCharacterStyle}>
                     <SelectTrigger id="characterStyle" className="w-full bg-input/50 border-border text-foreground">
                       <SelectValue placeholder="Välj en stil" />
@@ -321,15 +335,8 @@ export default function AnpassaVarelsePage() {
                       ))}
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground mt-1">Detta påverkar varelsens namn och historia.</p>
                 </div>
-                <Button onClick={handleGenerateBackstory} disabled={isLoadingBackstory} className="w-full font-semibold" variant="secondary">
-                  {isLoadingBackstory ? <LoadingSpinner size="sm" /> : (characterName ? 'Skapa Ny Historia' : 'Ge Namn &amp; Skapa Historia')}
-                </Button>
-                {backstory && (
-                  <ScrollArea className="h-32 mt-2 p-3 border rounded-md bg-muted/50 text-sm text-foreground">
-                    <p>{backstory}</p>
-                  </ScrollArea>
-                )}
               </CardContent>
             </Card>
 
@@ -362,12 +369,12 @@ export default function AnpassaVarelsePage() {
             </Tabs>
             <div className="flex flex-col sm:flex-row gap-4 mt-6">
               <Button 
-                onClick={handleCreateCharacterImage} 
-                disabled={isLoadingMainCharacterImage || isLoadingBackstory || !selectedClothing || !selectedHairstyle} 
+                onClick={handleCreateCharacter} 
+                disabled={isLoadingMainCharacterImage || isLoadingBackstory || isLoadingName || !selectedClothing || !selectedHairstyle} 
                 className="w-full font-semibold" 
                 size="lg"
               >
-                {isLoadingMainCharacterImage ? <LoadingSpinner size="sm" /> : 'Skapa Rymdvarelse'}
+                {(isLoadingMainCharacterImage || isLoadingBackstory || isLoadingName) ? <LoadingSpinner size="sm" /> : 'Skapa Rymdvarelse'}
               </Button>
               <Button asChild variant="outline" size="lg" className="w-full font-semibold">
                 <Link href="/">
