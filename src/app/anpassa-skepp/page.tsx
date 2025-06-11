@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -46,65 +47,70 @@ export default function AnpassaSkeppPage() {
 
   const [spaceshipImageUrl, setSpaceshipImageUrl] = useState('https://placehold.co/400x300.png');
   const [isLoadingMainSpaceshipImage, setIsLoadingMainSpaceshipImage] = useState(spaceshipImageUrl.startsWith('https://placehold.co'));
+  const [activeTab, setActiveTab] = useState<string>("wings");
 
+  // Effect for main spaceship image
   useEffect(() => {
-    const fetchImagesForList = (
-        list: SpaceshipPartOption[], // Current state of the list
-        setter: React.Dispatch<React.SetStateAction<SpaceshipPartOption[]>>
-    ) => {
-        list.forEach(opt => {
-            if (opt.imageUrl.startsWith('https://placehold.co') && opt.isLoadingImage) {
-                // isLoadingImage is already true from useState.
-                generateImage({ prompt: opt.imageHint })
-                    .then(result => {
-                        setter(prev =>
-                            prev.map(o =>
-                                o.id === opt.id
-                                    ? { ...o, imageUrl: result.imageDataUri, isLoadingImage: false }
-                                    : o
-                            )
-                        );
-                    })
-                    .catch(error => {
-                        console.error(`Failed to generate image for ${opt.name}:`, error);
-                        setter(prev =>
-                            prev.map(o =>
-                                o.id === opt.id ? { ...o, isLoadingImage: false } : o // Stop loading, keep placeholder
-                            )
-                        );
-                    });
-            } else if (!opt.imageUrl.startsWith('https://placehold.co') && opt.isLoadingImage) {
-                // Corrects isLoading state if image is already loaded but flag is true
-                 setter(prev =>
-                    prev.map(o => (o.id === opt.id ? { ...o, isLoadingImage: false } : o))
-                );
-            }
-        });
-    };
-
-    fetchImagesForList(wingOptions, setWingOptions);
-    fetchImagesForList(engineOptions, setEngineOptions);
-    fetchImagesForList(decorationOptions, setDecorationOptions);
-
-    const generateMainSpaceshipImage = async () => {
-      if (spaceshipImageUrl.startsWith('https://placehold.co') && isLoadingMainSpaceshipImage) {
-        try {
-          const result = await generateImage({ prompt: "spaceship cartoon simple" });
-          setSpaceshipImageUrl(result.imageDataUri);
-        } catch (error) {
-          console.error("Failed to generate main spaceship image:", error);
-        } finally {
-          setIsLoadingMainSpaceshipImage(false);
-        }
-      } else if (!spaceshipImageUrl.startsWith('https://placehold.co') && isLoadingMainSpaceshipImage) {
+    const generateMainImage = async () => {
+      try {
+        const result = await generateImage({ prompt: "spaceship cartoon simple" });
+        setSpaceshipImageUrl(result.imageDataUri);
+      } catch (error) {
+        console.error("Failed to generate main spaceship image:", error);
+      } finally {
         setIsLoadingMainSpaceshipImage(false);
       }
     };
 
-    if(isLoadingMainSpaceshipImage) {
-        generateMainSpaceshipImage();
+    if (spaceshipImageUrl.startsWith('https://placehold.co') && isLoadingMainSpaceshipImage) {
+      generateMainImage();
+    } else if (!spaceshipImageUrl.startsWith('https://placehold.co') && isLoadingMainSpaceshipImage) {
+      setIsLoadingMainSpaceshipImage(false);
     }
-  }, []); // Empty dependency array ensures this runs once on mount
+  }, [spaceshipImageUrl, isLoadingMainSpaceshipImage]);
+
+  // Effect for option images based on active tab
+  useEffect(() => {
+    const fetchImagesForOptionList = async (
+        list: SpaceshipPartOption[],
+        setter: React.Dispatch<React.SetStateAction<SpaceshipPartOption[]>>
+    ) => {
+        list.forEach(async (opt) => {
+            if (opt.imageUrl.startsWith('https://placehold.co') && !opt.isLoadingImage) {
+                setter(prev =>
+                    prev.map(o =>
+                        o.id === opt.id ? { ...o, isLoadingImage: true } : o
+                    )
+                );
+                try {
+                    const result = await generateImage({ prompt: opt.imageHint });
+                    setter(prev =>
+                        prev.map(o =>
+                            o.id === opt.id
+                                ? { ...o, imageUrl: result.imageDataUri, isLoadingImage: false }
+                                : o
+                        )
+                    );
+                } catch (error) {
+                    console.error(`Failed to generate image for ${opt.name}:`, error);
+                    setter(prev =>
+                        prev.map(o =>
+                            o.id === opt.id ? { ...o, isLoadingImage: false } : o // Stop loading, keep placeholder
+                        )
+                    );
+                }
+            }
+        });
+    };
+
+    if (activeTab === 'wings') {
+      fetchImagesForOptionList(wingOptions, setWingOptions);
+    } else if (activeTab === 'engines') {
+      fetchImagesForOptionList(engineOptions, setEngineOptions);
+    } else if (activeTab === 'decorations') {
+      fetchImagesForOptionList(decorationOptions, setDecorationOptions);
+    }
+  }, [activeTab, wingOptions, engineOptions, decorationOptions]);
 
 
   const renderOptionGrid = (options: SpaceshipPartOption[], selected: string | null, setSelected: (id: string) => void) => (
@@ -144,7 +150,7 @@ export default function AnpassaSkeppPage() {
           </div>
 
           <div className="lg:col-span-2">
-            <Tabs defaultValue="wings" className="w-full">
+            <Tabs defaultValue="wings" className="w-full" onValueChange={setActiveTab}>
               <TabsList className="grid w-full grid-cols-3 bg-primary/20">
                 <TabsTrigger value="wings" className="text-xs sm:text-sm data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"><Orbit className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5" />Vingar</TabsTrigger>
                 <TabsTrigger value="engines" className="text-xs sm:text-sm data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"><Flame className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5" />Motorer</TabsTrigger>
@@ -177,3 +183,5 @@ export default function AnpassaSkeppPage() {
     </div>
   );
 }
+
+    

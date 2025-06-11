@@ -64,9 +64,31 @@ export default function AnpassaVarelsePage() {
   
   const [characterImageUrl, setCharacterImageUrl] = useState('https://placehold.co/300x400.png');
   const [isLoadingMainCharacterImage, setIsLoadingMainCharacterImage] = useState(characterImageUrl.startsWith('https://placehold.co'));
+  const [activeTab, setActiveTab] = useState<string>("clothes");
 
+  // Effect for main character image
   useEffect(() => {
-    const fetchOptionImage = async (
+    const generateMainImage = async () => {
+      try {
+        const result = await generateImage({ prompt: "cute alien character simple" }); 
+        setCharacterImageUrl(result.imageDataUri);
+      } catch (error) {
+        console.error("Failed to generate main character image:", error);
+      } finally {
+        setIsLoadingMainCharacterImage(false);
+      }
+    };
+
+    if (characterImageUrl.startsWith('https://placehold.co') && isLoadingMainCharacterImage) {
+      generateMainImage();
+    } else if (!characterImageUrl.startsWith('https://placehold.co') && isLoadingMainCharacterImage) {
+      setIsLoadingMainCharacterImage(false);
+    }
+  }, [characterImageUrl, isLoadingMainCharacterImage]);
+
+  // Effect for option images based on active tab
+  useEffect(() => {
+    const fetchOptionImageAndUpdateState = async (
       option: CustomizationOption,
       setter: React.Dispatch<React.SetStateAction<CustomizationOption[]>>
     ) => {
@@ -88,26 +110,24 @@ export default function AnpassaVarelsePage() {
       }
     };
 
-    clothingOptions.forEach(opt => fetchOptionImage(opt, setClothingOptions));
-    hairstyleOptions.forEach(opt => fetchOptionImage(opt, setHairstyleOptions));
-    accessoryOptions.forEach(opt => fetchOptionImage(opt, setAccessoryOptions));
+    let optionsToLoad: CustomizationOption[] = [];
+    let setterFunction: React.Dispatch<React.SetStateAction<CustomizationOption[]>> | null = null;
 
-    const generateMainCharacterImage = async () => {
-      if (characterImageUrl.startsWith('https://placehold.co') && !isLoadingMainCharacterImage) {
-        setIsLoadingMainCharacterImage(true);
-        try {
-          const result = await generateImage({ prompt: "cute alien character simple" }); 
-          setCharacterImageUrl(result.imageDataUri);
-        } catch (error) {
-          console.error("Failed to generate main character image:", error);
-        } finally {
-          setIsLoadingMainCharacterImage(false);
-        }
-      }
-    };
+    if (activeTab === 'clothes') {
+      optionsToLoad = clothingOptions;
+      setterFunction = setClothingOptions;
+    } else if (activeTab === 'hairstyles') {
+      optionsToLoad = hairstyleOptions;
+      setterFunction = setHairstyleOptions;
+    } else if (activeTab === 'accessories') {
+      optionsToLoad = accessoryOptions;
+      setterFunction = setAccessoryOptions;
+    }
 
-    generateMainCharacterImage();
-  }, []);
+    if (setterFunction) {
+      optionsToLoad.forEach(opt => fetchOptionImageAndUpdateState(opt, setterFunction!));
+    }
+  }, [activeTab, clothingOptions, hairstyleOptions, accessoryOptions]);
 
 
   const handleGenerateBackstory = async () => {
@@ -171,7 +191,7 @@ export default function AnpassaVarelsePage() {
           </div>
 
           <div className="lg:col-span-2">
-            <Card className="w-full shadow-xl bg-card/80 backdrop-blur-sm mb-6">
+             <Card className="w-full shadow-xl bg-card/80 backdrop-blur-sm mb-6">
               <CardHeader>
                 <CardTitle className="text-xl font-headline text-accent flex items-center gap-2"><Wand2 /> Bakgrundshistoria</CardTitle>
               </CardHeader>
@@ -200,7 +220,7 @@ export default function AnpassaVarelsePage() {
               </CardContent>
             </Card>
 
-            <Tabs defaultValue="clothes" className="w-full">
+            <Tabs defaultValue="clothes" className="w-full" onValueChange={setActiveTab}>
               <TabsList className="grid w-full grid-cols-3 bg-primary/20">
                 <TabsTrigger value="clothes" className="text-xs sm:text-sm data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"><Shirt className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5" />Kläder</TabsTrigger>
                 <TabsTrigger value="hairstyles" className="text-xs sm:text-sm data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"><Sparkles className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5" />Frisyrer</TabsTrigger>
@@ -233,3 +253,5 @@ export default function AnpassaVarelsePage() {
     </div>
   );
 }
+
+    
