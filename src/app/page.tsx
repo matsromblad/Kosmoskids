@@ -5,12 +5,12 @@ import { useState, useEffect } from 'react';
 import { Users, Rocket, Globe2, RotateCcw } from 'lucide-react';
 import Image from 'next/image';
 import { MainMenuButton } from '@/components/game/MainMenuButton';
-import { generateImage } from '@/ai/flows/generate-image-flow';
-import { LoadingSpinner } from '@/components/game/LoadingSpinner';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { LoadingSpinner } from '@/components/game/LoadingSpinner';
+
 
 interface StoredCharacter {
   name: string;
@@ -38,20 +38,20 @@ interface StoredSpaceship {
 
 const CHARACTER_STORAGE_KEY = "kosmoskids_character";
 const SPACESHIP_STORAGE_KEY = "kosmoskids_spaceship";
-const LOGO_STORAGE_KEY = "kosmoskids_logo";
 const ACTIVE_PLANET_IDS_KEY = "kosmoskids_active_planet_ids";
 const PLANET_IMAGES_KEY = "kosmoskids_planet_images";
 const VISITED_PLANETS_KEY = "kosmoskids_visited_planets";
 const CHARACTER_CUSTOMIZATION_OPTIONS_KEY_V1 = "KOSMOSKIDS_CHARACTER_CUSTOMIZATION_OPTIONS_V1";
 const SPACESHIP_CUSTOMIZATION_OPTIONS_KEY_V1 = "KOSMOSKIDS_SPACESHIP_CUSTOMIZATION_OPTIONS_V1";
+const LOGO_STORAGE_KEY = "kosmoskids_logo"; // Behålls om annan logik skulle spara logotypen, men tas bort från sidans direkta hantering
 
 
 export default function Home() {
   const [characterData, setCharacterData] = useState<StoredCharacter | null>(null);
   const [spaceshipData, setSpaceshipData] = useState<StoredSpaceship | null>(null);
-  const [logoImageUrl, setLogoImageUrl] = useState<string | null>(null);
-  const [isLoadingLogo, setIsLoadingLogo] = useState<boolean>(false);
   const { toast } = useToast();
+
+  const staticLogoUrl = "https://placehold.co/200x200/2E3192/FFFFFF.png?text=Kosmoskids";
 
   useEffect(() => {
     const storedCharacterRaw = localStorage.getItem(CHARACTER_STORAGE_KEY);
@@ -73,65 +73,21 @@ export default function Home() {
         localStorage.removeItem(SPACESHIP_STORAGE_KEY);
       }
     }
-
-    const storedLogoUrl = localStorage.getItem(LOGO_STORAGE_KEY);
-    if (storedLogoUrl) {
-      setLogoImageUrl(storedLogoUrl);
-    } else {
-      setIsLoadingLogo(true);
-      generateImage({ prompt: "planet logo space kids game vibrant colors" })
-        .then(result => {
-          setLogoImageUrl(result.imageDataUri);
-          try {
-            localStorage.setItem(LOGO_STORAGE_KEY, result.imageDataUri);
-          } catch (e: any) {
-            // If logo saving fails due to quota, it's not critical.
-            // The app will try to regenerate next time or use placeholder.
-            console.warn("Could not save logo to localStorage, likely due to quota", e.message);
-          }
-        })
-        .catch(error => {
-          console.error("Failed to generate logo image:", error);
-          setLogoImageUrl("https://placehold.co/200x200/2E3192/FFFFFF.png?text=Kosmos");
-        })
-        .finally(() => {
-          setIsLoadingLogo(false);
-        });
-    }
   }, []);
 
   const handleStartOver = () => {
     localStorage.removeItem(CHARACTER_STORAGE_KEY);
     localStorage.removeItem(SPACESHIP_STORAGE_KEY);
-    localStorage.removeItem(LOGO_STORAGE_KEY); 
+    // localStorage.removeItem(LOGO_STORAGE_KEY); // Logotypen är nu statisk, så denna behövs inte för sidans funktion
     localStorage.removeItem(ACTIVE_PLANET_IDS_KEY);
     localStorage.removeItem(PLANET_IMAGES_KEY);
     localStorage.removeItem(VISITED_PLANETS_KEY);
     localStorage.removeItem(CHARACTER_CUSTOMIZATION_OPTIONS_KEY_V1);
     localStorage.removeItem(SPACESHIP_CUSTOMIZATION_OPTIONS_KEY_V1);
 
-
     setCharacterData(null);
     setSpaceshipData(null);
-    setLogoImageUrl(null); 
-    setIsLoadingLogo(true); 
-     generateImage({ prompt: "planet logo space kids game vibrant colors" }) 
-        .then(result => {
-          setLogoImageUrl(result.imageDataUri);
-           try {
-            localStorage.setItem(LOGO_STORAGE_KEY, result.imageDataUri);
-          } catch (e: any) {
-            console.warn("Could not save regenerated logo to localStorage, likely due to quota", e.message);
-          }
-        })
-        .catch(error => {
-          console.error("Failed to generate logo image:", error);
-          setLogoImageUrl("https://placehold.co/200x200/2E3192/FFFFFF.png?text=Kosmos");
-        })
-        .finally(() => {
-          setIsLoadingLogo(false);
-        });
-
+    
     toast({
       title: "Spelet Återställt!",
       description: "Din varelse, skepp och utforskningsframsteg har nollställts. Nya planeter och anpassningsalternativ väntar!",
@@ -145,29 +101,15 @@ export default function Home() {
     <div className="flex flex-col items-center justify-center min-h-screen p-4 md:p-8 bg-gradient-to-br from-background to-indigo-900/50">
       <header className="text-center mb-12">
          <div className="relative w-40 h-40 mx-auto mb-4">
-            {isLoadingLogo && !logoImageUrl ? (
-              <div className="w-full h-full flex items-center justify-center bg-muted/50 rounded-full">
-                <LoadingSpinner size="lg" />
-              </div>
-            ) : logoImageUrl ? (
-              <Image
-                  src={logoImageUrl}
-                  alt="Kosmoskids Logotyp"
-                  width={200}
-                  height={200}
-                  className="rounded-full object-contain"
-                  data-ai-hint="planet logo"
-              />
-            ) : ( 
-              <Image
-                src="https://placehold.co/200x200/2E3192/FFFFFF.png?text=Kosmos"
-                alt="Kosmoskids Logotyp Placeholder"
+            <Image
+                src={staticLogoUrl}
+                alt="Kosmoskids Logotyp"
                 width={200}
                 height={200}
                 className="rounded-full object-contain"
-                data-ai-hint="planet logo"
+                data-ai-hint="space game logo"
+                priority // Add priority for LCP
             />
-            )}
         </div>
         <h1 className="text-5xl md:text-7xl font-headline font-bold text-primary animate-pulse">
           Kosmoskids
