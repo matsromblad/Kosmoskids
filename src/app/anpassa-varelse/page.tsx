@@ -17,6 +17,8 @@ import { generateImage, type GenerateImageInput } from '@/ai/flows/generate-imag
 import { useToast } from "@/hooks/use-toast";
 import { LoadingSpinner } from '@/components/game/LoadingSpinner';
 import { getRandomUniqueElements } from '@/lib/utils';
+import { Input } from '@/components/ui/input';
+import { generateSpacifiedCharacterName, type GenerateSpacifiedCharacterNameInput } from '@/ai/flows/generate-spacified-name';
 
 interface CustomizationOption {
   id: string;
@@ -75,9 +77,6 @@ const characterStyles = [
   { value: 'Äventyrlig', label: 'Äventyrlig'},
 ];
 
-const daughterNames = ["Saquina", "Zoe", "Indy"];
-const spacePrefixes = ["Rymd-", "Stjärn-", "Galax-", "Kosmo-", "Nebula-"];
-
 export default function AnpassaVarelsePage() {
   const [selectedClothing, setSelectedClothing] = useState<string | null>(null);
   const [selectedHairstyle, setSelectedHairstyle] = useState<string | null>(null);
@@ -92,6 +91,7 @@ export default function AnpassaVarelsePage() {
   const [isLoadingMainCharacterImage, setIsLoadingMainCharacterImage] = useState(false);
   const [isLoadingName, setIsLoadingName] = useState(false);
   const [characterName, setCharacterName] = useState<string | null>(null);
+  const [userInputName, setUserInputName] = useState<string>("");
   
   const [clothingOptions, setClothingOptions] = useState<CustomizationOption[]>([]);
   const [hairstyleOptions, setHairstyleOptions] = useState<CustomizationOption[]>([]);
@@ -124,7 +124,6 @@ export default function AnpassaVarelsePage() {
         currentClothingOpts = stored.clothing || getRandomUniqueElements(allClothingOptionsGlobal, 3);
         currentHairstyleOpts = stored.hairstyle || getRandomUniqueElements(allHairstyleOptionsGlobal, 3);
         currentAccessoryOpts = stored.accessories || getRandomUniqueElements(allAccessoryOptionsGlobal, 3);
-         // Ensure options are not empty if localStorage had empty arrays
         if (!currentClothingOpts.length) currentClothingOpts = getRandomUniqueElements(allClothingOptionsGlobal, 3);
         if (!currentHairstyleOpts.length) currentHairstyleOpts = getRandomUniqueElements(allHairstyleOptionsGlobal, 3);
         if (!currentAccessoryOpts.length) currentAccessoryOpts = getRandomUniqueElements(allAccessoryOptionsGlobal, 3);
@@ -152,6 +151,7 @@ export default function AnpassaVarelsePage() {
       try {
         const storedCharacter: StoredCharacter = JSON.parse(storedCharacterRaw);
         setCharacterName(storedCharacter.name);
+        // setUserInputName(storedCharacter.name); // Optional: prefill input if loading existing character. For now, let's keep it for new names.
         setCharacterImageUrl(storedCharacter.imageUrl);
         setBackstory(storedCharacter.backstory);
         setSelectedCharacterStyle(storedCharacter.style);
@@ -173,20 +173,19 @@ export default function AnpassaVarelsePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-
-  const generateAndSetCharacterName = (): string => {
-    const randomPrefix = spacePrefixes[Math.floor(Math.random() * spacePrefixes.length)];
-    const randomDaughterName = daughterNames[Math.floor(Math.random() * daughterNames.length)];
-    const newName = `${randomPrefix}${randomDaughterName}`;
-    setCharacterName(newName);
-    return newName;
-  };
-
   const handleCreateCharacter = async () => {
     if (!selectedClothing || !selectedHairstyle) {
       toast({
         title: "Val Saknas",
         description: "Välj åtminstone kläder och frisyr för din varelse.",
+        variant: "destructive",
+      });
+      return;
+    }
+     if (!userInputName.trim()) {
+      toast({
+        title: "Namn Saknas",
+        description: "Vänligen ange ett namn för din varelse i textfältet.",
         variant: "destructive",
       });
       return;
@@ -197,14 +196,26 @@ export default function AnpassaVarelsePage() {
     setIsLoadingName(true);
     setCharacterImageUrl(null);
     setBackstory(null);
+    setCharacterName(null);
 
-    let currentName = characterName;
-    if (!currentName) {
-      currentName = generateAndSetCharacterName();
+    let currentName = "";
+    try {
+      const nameInput: GenerateSpacifiedCharacterNameInput = { originalName: userInputName.trim() };
+      const nameResult = await generateSpacifiedCharacterName(nameInput);
+      currentName = nameResult.spacifiedName;
+      setCharacterName(currentName);
+    } catch (error: any) {
+      console.error("Error generating spacified name:", error);
+      let desc = "Kunde inte rymdifiera namnet. Använder det angivna namnet direkt.";
+      if (error.message && (error.message.includes("503") || error.message.toLowerCase().includes("overloaded"))) {
+        desc = "AI-tjänsten för att skapa namn är upptagen. Använder det angivna namnet direkt.";
+      }
+      toast({ title: "Fel vid Namngenerering", description: desc, variant: "default" });
+      currentName = userInputName.trim(); 
+      setCharacterName(currentName);
+    } finally {
+      setIsLoadingName(false);
     }
-    setCharacterName(currentName);
-    setIsLoadingName(false);
-
 
     let generatedBackstory = "";
     try {
@@ -215,13 +226,13 @@ export default function AnpassaVarelsePage() {
       const backstoryResult = await generateCharacterBackstory(backstoryInput);
       generatedBackstory = backstoryResult.backstory;
       setBackstory(generatedBackstory);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error generating backstory:", error);
-      toast({
-        title: "Fel vid Skapande av Historia",
-        description: "Kunde inte generera bakgrundshistoria. Försöker skapa varelse utan.",
-        variant: "default",
-      });
+      let desc = "Kunde inte generera bakgrundshistoria. Skapar varelse utan.";
+       if (error.message && (error.message.includes("503") || error.message.toLowerCase().includes("overloaded"))) {
+        desc = "AI-tjänsten för att skapa historier är upptagen. Skapar varelse utan historia.";
+      }
+      toast({ title: "Fel vid Historiegenerering", description: desc, variant: "default" });
     } finally {
       setIsLoadingBackstory(false);
     }
@@ -229,7 +240,6 @@ export default function AnpassaVarelsePage() {
     const clothingNameStr = clothingOptions.find(opt => opt.id === selectedClothing)?.name || allClothingOptionsGlobal.find(opt => opt.id === selectedClothing)?.name || "standardklädsel";
     const hairstyleNameStr = hairstyleOptions.find(opt => opt.id === selectedHairstyle)?.name || allHairstyleOptionsGlobal.find(opt => opt.id === selectedHairstyle)?.name || "standardfrisyr";
     const accessoryNameStr = accessoryOptions.find(opt => opt.id === selectedAccessory)?.name || allAccessoryOptionsGlobal.find(opt => opt.id === selectedAccessory)?.name || "inga tillbehör";
-
 
     let prompt = `En rymdvarelse vid namn ${currentName}. Varelsen är ${selectedCharacterStyle.toLowerCase()}. `;
     prompt += `Klädsel: ${clothingNameStr}. `;
@@ -321,18 +331,11 @@ export default function AnpassaVarelsePage() {
       });
     } finally {
       setIsLoadingMainCharacterImage(false);
-      setIsLoadingBackstory(false); 
-      setIsLoadingName(false); 
     }
   };
 
   const renderOptionGrid = (options: CustomizationOption[], selected: string | null, setSelected: (id: string) => void, currentActiveTab: string, tabName: string) => {
-     // Do not force mount if the option is not selected, but still render if activeTab matches
-     // This ensures that the content for the active tab is always rendered for layout purposes.
-     // We only return null if it's not the active tab AND there's no selected item in this category for some reason.
-     // However, options should always be populated for the active tab.
      if (currentActiveTab !== tabName && !options.some(opt => selected === opt.id) && options.length === 0) return null;
-
 
     return (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-1">
@@ -390,9 +393,27 @@ export default function AnpassaVarelsePage() {
           </div>
 
           <div className="lg:col-span-2">
+            <Card className="w-full shadow-xl bg-card/80 backdrop-blur-sm mb-6">
+              <CardHeader>
+                <CardTitle className="text-xl font-headline text-accent flex items-center gap-2">
+                  <Sparkles className="h-5 w-5" /> Namnge din Varelse
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Input
+                  id="characterBaseName"
+                  placeholder="Skriv ett grundnamn här (t.ex. 'Lisa')"
+                  value={userInputName}
+                  onChange={(e) => setUserInputName(e.target.value)}
+                  className="bg-input/50 border-border text-foreground"
+                />
+                <p className="text-xs text-muted-foreground mt-1">AI:n kommer att 'rymdifiera' detta namn!</p>
+              </CardContent>
+            </Card>
+
              <Card className="w-full shadow-xl bg-card/80 backdrop-blur-sm mb-6">
               <CardHeader>
-                <CardTitle className="text-xl font-headline text-accent flex items-center gap-2"><Wand2 /> Stil för Historia & Namn</CardTitle>
+                <CardTitle className="text-xl font-headline text-accent flex items-center gap-2"><Wand2 /> Stil för Historia</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
@@ -407,7 +428,7 @@ export default function AnpassaVarelsePage() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-muted-foreground mt-1">Detta påverkar varelsens namn och historia.</p>
+                  <p className="text-xs text-muted-foreground mt-1">Detta påverkar varelsens historia.</p>
                 </div>
               </CardContent>
             </Card>
