@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { GameHeader } from '@/components/layout/GameHeader';
 import { PlanetCard } from '@/components/game/PlanetCard';
 import { Flame, Snowflake, Gem, Bot, Sun, Leaf, Telescope, Sprout, Cloud, Mountain } from 'lucide-react';
@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Award } from 'lucide-react';
 import { LoadingSpinner } from '@/components/game/LoadingSpinner';
-import { useToast } from "@/hooks/use-toast"; // Added useToast import
+import { useToast } from "@/hooks/use-toast"; 
 
 interface PlanetDefinition {
   id: string;
@@ -115,7 +115,6 @@ const NUMBER_OF_ACTIVE_PLANETS = 4;
 function getRandomUniqueElements<T>(arr: T[], numElements: number): T[] {
   if (numElements > arr.length) {
     console.warn(`Requested ${numElements} unique elements, but array only has ${arr.length}. Returning all elements shuffled.`);
-    // Fallback: return a shuffled copy of the original array if more elements are requested than available.
      return [...arr].sort(() => 0.5 - Math.random());
   }
   const shuffled = [...arr].sort(() => 0.5 - Math.random());
@@ -126,7 +125,8 @@ export default function RymdkartaPage() {
   const [activePlanetDefinitions, setActivePlanetDefinitions] = useState<PlanetDefinition[]>([]);
   const [isLoadingDefinitions, setIsLoadingDefinitions] = useState(true);
   const [allPlanetsVisited, setAllPlanetsVisited] = useState(false);
-  const { toast } = useToast(); // Initialized useToast
+  const { toast } = useToast();
+  const currentlyFetchingRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const storedActivePlanetIdsRaw = localStorage.getItem(ACTIVE_PLANET_IDS_KEY);
@@ -135,11 +135,10 @@ export default function RymdkartaPage() {
     if (storedActivePlanetIdsRaw) {
       try {
         currentActivePlanetIds = JSON.parse(storedActivePlanetIdsRaw);
-        // Basic validation: ensure it's an array of strings and correct length
         if (!Array.isArray(currentActivePlanetIds) || 
             currentActivePlanetIds.length !== NUMBER_OF_ACTIVE_PLANETS || 
-            !currentActivePlanetIds.every(id => typeof id === 'string')) {
-          console.warn("Invalid stored active planet IDs, selecting new ones.");
+            !currentActivePlanetIds.every(id => typeof id === 'string' && allPlanetDefinitions.some(pDef => pDef.id === id))) {
+          console.warn("Invalid or outdated stored active planet IDs, selecting new ones.");
           currentActivePlanetIds = []; 
         }
       } catch (e) {
@@ -154,10 +153,15 @@ export default function RymdkartaPage() {
       currentActivePlanetIds = selectedPlanetDefinitions.map(p => p.id);
       try {
         localStorage.setItem(ACTIVE_PLANET_IDS_KEY, JSON.stringify(currentActivePlanetIds));
-        localStorage.removeItem(PLANET_IMAGES_KEY); // Clear old images when new planets are chosen
-        localStorage.removeItem(VISITED_PLANETS_KEY); // Clear visited status for old planets
+        localStorage.removeItem(PLANET_IMAGES_KEY); 
+        localStorage.removeItem(VISITED_PLANETS_KEY);
       } catch (e) {
         console.error("Error setting new active planet IDs in localStorage", e);
+         toast({
+          title: "Lagringsfel",
+          description: "Kunde inte spara de nya planetvalen. Försök ladda om sidan.",
+          variant: "destructive",
+        });
       }
     }
     
@@ -168,12 +172,13 @@ export default function RymdkartaPage() {
     const initialPlanetStates = resolvedDefinitions.map(pDef => ({
         ...pDef,
         imageUrl: `https://placehold.co/300x200/2E3192/FFFFFF.png?text=${encodeURIComponent(pDef.name)}`,
-        isLoadingImage: true,
-        isVisited: false,
+        isLoadingImage: true, // Will be updated based on localStorage later
+        isVisited: false, // Will be updated based on localStorage later
     }));
     
     setActivePlanetDefinitions(initialPlanetStates);
     setIsLoadingDefinitions(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -185,7 +190,7 @@ export default function RymdkartaPage() {
       try {
         storedPlanetImages = JSON.parse(storedPlanetImagesRaw);
       } catch (e) {
-        console.error("Failed to parse stored planet images", e);
+        console.error("Failed to parse stored planet images, will attempt to regenerate.", e);
         localStorage.removeItem(PLANET_IMAGES_KEY); 
       }
     }
@@ -196,7 +201,7 @@ export default function RymdkartaPage() {
       try {
         storedVisitedPlanets = JSON.parse(storedVisitedPlanetsRaw);
       } catch (e) {
-        console.error("Failed to parse stored visited planets", e);
+        console.error("Failed to parse stored visited planets.", e);
         localStorage.removeItem(VISITED_PLANETS_KEY); 
       }
     }
@@ -227,13 +232,14 @@ export default function RymdkartaPage() {
           storedPlanetImagesMap = JSON.parse(mapRaw);
         } catch (e) {
           console.error("Failed to parse storedPlanetImagesMap in fetchImagesSequentially, resetting.", e);
-          storedPlanetImagesMap = {}; // Reset to empty if parsing fails
+          storedPlanetImagesMap = {}; 
         }
       }
       
       for (const planetData of activePlanetDefinitions) {
-        if (planetData.isLoadingImage && !storedPlanetImagesMap[planetData.id]) {
+        if (planetData.isLoadingImage && !storedPlanetImagesMap[planetData.id] && !currentlyFetchingRef.current.has(planetData.id)) {
           try {
+            currentlyFetchingRef.current.add(planetData.id);
             const result = await generateImage({ prompt: planetData.imageHint });
             
             storedPlanetImagesMap[planetData.id] = result.imageDataUri;
@@ -242,10 +248,10 @@ export default function RymdkartaPage() {
               localStorage.setItem(PLANET_IMAGES_KEY, JSON.stringify(storedPlanetImagesMap));
             } catch (e: any) {
               if (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
-                console.error(`Quota exceeded when trying to save planet images. Image for ${planetData.name} might not be persisted.`, e);
+                console.warn(`Quota exceeded for PLANET_IMAGES_KEY. Image for ${planetData.name} might not be persisted.`, e.message);
                 toast({
                   title: "Lagringsutrymme Nästan Fullt",
-                  description: `Bilden för ${planetData.name} kunde inte sparas permanent på grund av fullt lagringsutrymme. Den kan behöva laddas om vid nästa besök.`,
+                  description: `Bilden för ${planetData.name} kunde inte sparas permanent. Den kan behöva laddas om vid nästa besök.`,
                   variant: "default",
                   duration: 7000,
                 });
@@ -268,11 +274,11 @@ export default function RymdkartaPage() {
             );
           } catch (error: any) {
             console.error(`Failed to generate image for ${planetData.name}:`, error);
-             let desc = `Kunde inte generera bild för ${planetData.name}. Försök igen senare.`;
+             let desc = `Kunde inte generera bild för ${planetData.name}. Använder platshållare.`;
             if (error.message && (error.message.includes("503") || error.message.toLowerCase().includes("overloaded"))) {
-                desc = `AI-tjänsten för att skapa bilder för ${planetData.name} verkar vara upptagen. Prova igen om en liten stund!`;
+                desc = `AI-tjänsten för att skapa bilder för ${planetData.name} verkar vara upptagen. Använder platshållare.`;
             } else if (error.message && error.message.toLowerCase().includes("quota")) {
-                desc = `AI-tjänsten har nått sin kvot för idag för bilder till ${planetData.name}. Prova igen imorgon!`;
+                desc = `AI-tjänsten har nått sin kvot för idag för bilder till ${planetData.name}. Använder platshållare.`;
             }
             toast({
                 title: "Bildgenereringsfel",
@@ -284,8 +290,11 @@ export default function RymdkartaPage() {
                 p.id === planetData.id ? { ...p, isLoadingImage: false } : p 
               )
             );
+          } finally {
+            currentlyFetchingRef.current.delete(planetData.id);
           }
         } else if (planetData.isLoadingImage && storedPlanetImagesMap[planetData.id]) {
+           // If image was in localStorage from the start of this effect run, but state wasn't updated yet
            setActivePlanetDefinitions(prevs =>
               prevs.map(p =>
                 p.id === planetData.id ? { ...p, imageUrl: storedPlanetImagesMap[planetData.id], isLoadingImage: false } : p
@@ -315,6 +324,10 @@ export default function RymdkartaPage() {
       localStorage.removeItem(VISITED_PLANETS_KEY);
       setActivePlanetDefinitions(prevPlanets => prevPlanets.map(p => ({ ...p, isVisited: false })));
       setAllPlanetsVisited(false);
+      toast({
+        title: "Utforskning Återställd!",
+        description: "Du kan nu besöka de nuvarande planeterna igen.",
+      });
     } catch (e) {
         console.error("Error resetting exploration (visited planets)", e);
         toast({
@@ -325,7 +338,7 @@ export default function RymdkartaPage() {
     }
   };
 
-  if (isLoadingDefinitions) {
+  if (isLoadingDefinitions && activePlanetDefinitions.length === 0) { // Ensure we show loading if definitions are truly loading AND not yet populated
     return (
       <div className="min-h-screen flex flex-col bg-gradient-to-br from-background to-indigo-900/50">
         <GameHeader title="Laddar Rymdkarta..." />
@@ -353,10 +366,10 @@ export default function RymdkartaPage() {
                 Du har besökt alla kända platser i denna sektor av Kosmoskids-galaxen!
               </p>
               <p className="text-md text-muted-foreground">
-                Vilket fantastiskt äventyr det har varit. Du är en sann upptäckare!
+                Vilket fantastiskt äventyr det har varit. Du är en sann upptäckare! Kom tillbaka efter att ha tryckt "Börja Om Spelet" i huvudmenyn för att upptäcka nya planeter.
               </p>
               <Button onClick={handleResetExploration} size="lg" className="font-semibold">
-                Utforska Samma Planeter Igen
+                Besök Samma Planeter Igen
               </Button>
             </CardContent>
           </Card>
@@ -394,4 +407,4 @@ export default function RymdkartaPage() {
 }
     
 
-      
+    
