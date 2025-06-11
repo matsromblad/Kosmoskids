@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { LoadingSpinner } from '@/components/game/LoadingSpinner';
 
 interface OptionCardProps {
   name: string;
@@ -8,9 +9,10 @@ interface OptionCardProps {
   imageHint: string;
   isSelected: boolean;
   onSelect: () => void;
+  isLoadingImage?: boolean;
 }
 
-export function OptionCard({ name, imageUrl, imageHint, isSelected, onSelect }: OptionCardProps) {
+export function OptionCard({ name, imageUrl, imageHint, isSelected, onSelect, isLoadingImage }: OptionCardProps) {
   return (
     <Card
       className={cn(
@@ -26,8 +28,12 @@ export function OptionCard({ name, imageUrl, imageHint, isSelected, onSelect }: 
       aria-label={`Välj ${name}`}
     >
       <CardContent className="p-3 flex flex-col items-center gap-2">
-        <div className="w-20 h-20 relative rounded-md overflow-hidden bg-muted">
-          <Image src={imageUrl} alt={name} layout="fill" objectFit="contain" data-ai-hint={imageHint} />
+        <div className="w-20 h-20 relative rounded-md overflow-hidden bg-muted flex items-center justify-center">
+          {isLoadingImage ? (
+            <LoadingSpinner size="sm" />
+          ) : (
+            <Image src={imageUrl} alt={name} layout="fill" objectFit="contain" data-ai-hint={imageHint} />
+          )}
         </div>
         <p className={cn("text-xs text-center font-medium", isSelected ? "text-accent" : "text-foreground")}>
           {name}

@@ -20,19 +20,19 @@ interface SpaceshipPartOption {
 }
 
 const initialWingOptions: SpaceshipPartOption[] = [
-  { id: 'wing1', name: 'Snabba Vingar', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'fast wings' },
-  { id: 'wing2', name: 'Solpanels-Vingar', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'solar panel wings' },
+  { id: 'wing1', name: 'Snabba Vingar', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'fast wings spaceship' },
+  { id: 'wing2', name: 'Solpanels-Vingar', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'solar panel wings spaceship' },
   { id: 'wing3', name: 'Mini-vingar', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'mini wings spaceship' },
 ];
 const initialEngineOptions: SpaceshipPartOption[] = [
-  { id: 'engine1', name: 'Plasma Motor', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'plasma engine' },
-  { id: 'engine2', name: 'Hyperdrive X', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'hyperdrive engine' },
-  { id: 'engine3', name: 'Tyst Motor', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'silent engine' },
+  { id: 'engine1', name: 'Plasma Motor', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'plasma engine spaceship' },
+  { id: 'engine2', name: 'Hyperdrive X', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'hyperdrive engine spaceship' },
+  { id: 'engine3', name: 'Tyst Motor', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'silent engine spaceship' },
 ];
 const initialDecorationOptions: SpaceshipPartOption[] = [
-  { id: 'deco1', name: 'Stjärn-klistermärken', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'star stickers' },
-  { id: 'deco2', name: 'Rymd-flammor', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'space flames decal' },
-  { id: 'deco3', name: 'Kosmiska Blommor', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'cosmic flowers' },
+  { id: 'deco1', name: 'Stjärn-klistermärken', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'star stickers spaceship decal' },
+  { id: 'deco2', name: 'Rymd-flammor', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'space flames spaceship decal' },
+  { id: 'deco3', name: 'Kosmiska Blommor', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'cosmic flowers spaceship decal' },
 ];
 
 export default function AnpassaSkeppPage() {
@@ -45,43 +45,66 @@ export default function AnpassaSkeppPage() {
   const [decorationOptions, setDecorationOptions] = useState<SpaceshipPartOption[]>(initialDecorationOptions.map(opt => ({...opt, isLoadingImage: opt.imageUrl.startsWith('https://placehold.co')})));
 
   const [spaceshipImageUrl, setSpaceshipImageUrl] = useState('https://placehold.co/400x300.png');
-  const [isLoadingMainSpaceshipImage, setIsLoadingMainSpaceshipImage] = useState(true);
+  const [isLoadingMainSpaceshipImage, setIsLoadingMainSpaceshipImage] = useState(spaceshipImageUrl.startsWith('https://placehold.co'));
 
   useEffect(() => {
-    const fetchOptionImages = async (options: SpaceshipPartOption[], setOptionsState: React.Dispatch<React.SetStateAction<SpaceshipPartOption[]>>) => {
-      const updatedOptions = await Promise.all(options.map(async (opt) => {
-        if (opt.imageUrl.startsWith('https://placehold.co')) {
-          try {
-            const result = await generateImage({ prompt: opt.imageHint });
-            return { ...opt, imageUrl: result.imageDataUri, isLoadingImage: false };
-          } catch (error) {
-            console.error(`Failed to generate image for ${opt.name}:`, error);
-            return { ...opt, isLoadingImage: false }; // Keep placeholder or show error
-          }
-        }
-        return { ...opt, isLoadingImage: false };
-      }));
-      setOptionsState(updatedOptions);
+    const fetchImagesForList = (
+        list: SpaceshipPartOption[], // Current state of the list
+        setter: React.Dispatch<React.SetStateAction<SpaceshipPartOption[]>>
+    ) => {
+        list.forEach(opt => {
+            if (opt.imageUrl.startsWith('https://placehold.co') && opt.isLoadingImage) {
+                // isLoadingImage is already true from useState.
+                generateImage({ prompt: opt.imageHint })
+                    .then(result => {
+                        setter(prev =>
+                            prev.map(o =>
+                                o.id === opt.id
+                                    ? { ...o, imageUrl: result.imageDataUri, isLoadingImage: false }
+                                    : o
+                            )
+                        );
+                    })
+                    .catch(error => {
+                        console.error(`Failed to generate image for ${opt.name}:`, error);
+                        setter(prev =>
+                            prev.map(o =>
+                                o.id === opt.id ? { ...o, isLoadingImage: false } : o // Stop loading, keep placeholder
+                            )
+                        );
+                    });
+            } else if (!opt.imageUrl.startsWith('https://placehold.co') && opt.isLoadingImage) {
+                // Corrects isLoading state if image is already loaded but flag is true
+                 setter(prev =>
+                    prev.map(o => (o.id === opt.id ? { ...o, isLoadingImage: false } : o))
+                );
+            }
+        });
     };
 
-    fetchOptionImages(wingOptions, setWingOptions);
-    fetchOptionImages(engineOptions, setEngineOptions);
-    fetchOptionImages(decorationOptions, setDecorationOptions);
+    fetchImagesForList(wingOptions, setWingOptions);
+    fetchImagesForList(engineOptions, setEngineOptions);
+    fetchImagesForList(decorationOptions, setDecorationOptions);
 
-    const generateInitialSpaceshipImage = async () => {
-      setIsLoadingMainSpaceshipImage(true);
-      try {
-        const result = await generateImage({ prompt: "spaceship cartoon" });
-        setSpaceshipImageUrl(result.imageDataUri);
-      } catch (error) {
-        console.error("Failed to generate main spaceship image:", error);
-      } finally {
+    const generateMainSpaceshipImage = async () => {
+      if (spaceshipImageUrl.startsWith('https://placehold.co') && isLoadingMainSpaceshipImage) {
+        try {
+          const result = await generateImage({ prompt: "spaceship cartoon simple" });
+          setSpaceshipImageUrl(result.imageDataUri);
+        } catch (error) {
+          console.error("Failed to generate main spaceship image:", error);
+        } finally {
+          setIsLoadingMainSpaceshipImage(false);
+        }
+      } else if (!spaceshipImageUrl.startsWith('https://placehold.co') && isLoadingMainSpaceshipImage) {
         setIsLoadingMainSpaceshipImage(false);
       }
     };
-    generateInitialSpaceshipImage();
 
-  }, []);
+    if(isLoadingMainSpaceshipImage) {
+        generateMainSpaceshipImage();
+    }
+  }, []); // Empty dependency array ensures this runs once on mount
 
 
   const renderOptionGrid = (options: SpaceshipPartOption[], selected: string | null, setSelected: (id: string) => void) => (
@@ -90,8 +113,9 @@ export default function AnpassaSkeppPage() {
         <OptionCard
           key={opt.id}
           name={opt.name}
-          imageUrl={opt.isLoadingImage ? 'https://placehold.co/100x100.png' : opt.imageUrl}
+          imageUrl={opt.imageUrl}
           imageHint={opt.imageHint}
+          isLoadingImage={opt.isLoadingImage}
           isSelected={selected === opt.id}
           onSelect={() => setSelected(opt.id)}
         />
@@ -113,7 +137,7 @@ export default function AnpassaSkeppPage() {
                 {isLoadingMainSpaceshipImage ? (
                   <LoadingSpinner size="lg"/>
                 ) : (
-                  <Image src={spaceshipImageUrl} alt="Rymdskepp" width={400} height={300} className="rounded-lg object-contain shadow-lg border-2 border-primary" data-ai-hint="spaceship cartoon" />
+                  <Image src={spaceshipImageUrl} alt="Rymdskepp" width={400} height={300} className="rounded-lg object-contain shadow-lg border-2 border-primary" data-ai-hint="spaceship cartoon simple" />
                 )}
               </CardContent>
             </Card>

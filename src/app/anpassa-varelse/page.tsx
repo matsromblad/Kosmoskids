@@ -24,19 +24,19 @@ interface CustomizationOption {
 }
 
 const initialClothingOptions: CustomizationOption[] = [
-  { id: 'suit1', name: 'Rymddräkt Alfa', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'space suit' },
-  { id: 'suit2', name: 'Glittrig Overall', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'sparkly overall' },
-  { id: 'vest1', name: 'Skyddsväst Beta', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'protective vest' },
+  { id: 'suit1', name: 'Rymddräkt Alfa', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'alien space suit' },
+  { id: 'suit2', name: 'Glittrig Overall', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'sparkly alien overall' },
+  { id: 'vest1', name: 'Skyddsväst Beta', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'protective alien vest' },
 ];
 const initialHairstyleOptions: CustomizationOption[] = [
-  { id: 'hair1', name: 'Antenner', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'alien antennae' },
-  { id: 'hair2', name: 'Blått Spikigt Hår', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'blue spiky hair' },
-  { id: 'hair3', name: 'Lysande Tentakler', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'glowing tentacles' },
+  { id: 'hair1', name: 'Antenner', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'alien character antennae' },
+  { id: 'hair2', name: 'Blått Spikigt Hår', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'alien blue spiky hair' },
+  { id: 'hair3', name: 'Lysande Tentakler', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'glowing alien tentacles' },
 ];
 const initialAccessoryOptions: CustomizationOption[] = [
-  { id: 'acc1', name: 'Jetpack X', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'jetpack toy' },
-  { id: 'acc2', name: 'Rymdhjälm Pro', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'space helmet' },
-  { id: 'acc3', name: 'Stjärn-glasögon', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'star sunglasses' },
+  { id: 'acc1', name: 'Jetpack X', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'alien jetpack toy' },
+  { id: 'acc2', name: 'Rymdhjälm Pro', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'alien space helmet' },
+  { id: 'acc3', name: 'Stjärn-glasögon', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'alien star sunglasses' },
 ];
 
 const characterStyles = [
@@ -62,41 +62,63 @@ export default function AnpassaVarelsePage() {
   const [accessoryOptions, setAccessoryOptions] = useState<CustomizationOption[]>(initialAccessoryOptions.map(opt => ({...opt, isLoadingImage: opt.imageUrl.startsWith('https://placehold.co')})));
   
   const [characterImageUrl, setCharacterImageUrl] = useState('https://placehold.co/300x400.png');
-  const [isLoadingMainCharacterImage, setIsLoadingMainCharacterImage] = useState(true);
+  const [isLoadingMainCharacterImage, setIsLoadingMainCharacterImage] = useState(characterImageUrl.startsWith('https://placehold.co'));
 
   useEffect(() => {
-    const fetchOptionImages = async (options: CustomizationOption[], setOptionsState: React.Dispatch<React.SetStateAction<CustomizationOption[]>>) => {
-      const updatedOptions = await Promise.all(options.map(async (opt) => {
-        if (opt.imageUrl.startsWith('https://placehold.co')) {
-          try {
-            const result = await generateImage({ prompt: opt.imageHint });
-            return { ...opt, imageUrl: result.imageDataUri, isLoadingImage: false };
-          } catch (error) {
-            console.error(`Failed to generate image for ${opt.name}:`, error);
-            return { ...opt, isLoadingImage: false }; 
-          }
-        }
-        return { ...opt, isLoadingImage: false };
-      }));
-      setOptionsState(updatedOptions);
+    const fetchImagesForList = (
+        list: CustomizationOption[],
+        setter: React.Dispatch<React.SetStateAction<CustomizationOption[]>>
+    ) => {
+        list.forEach(opt => {
+            if (opt.imageUrl.startsWith('https://placehold.co') && opt.isLoadingImage) {
+                generateImage({ prompt: opt.imageHint })
+                    .then(result => {
+                        setter(prev =>
+                            prev.map(o =>
+                                o.id === opt.id
+                                    ? { ...o, imageUrl: result.imageDataUri, isLoadingImage: false }
+                                    : o
+                            )
+                        );
+                    })
+                    .catch(error => {
+                        console.error(`Failed to generate image for ${opt.name}:`, error);
+                        setter(prev =>
+                            prev.map(o =>
+                                o.id === opt.id ? { ...o, isLoadingImage: false } : o
+                            )
+                        );
+                    });
+            } else if (!opt.imageUrl.startsWith('https://placehold.co') && opt.isLoadingImage) {
+                 setter(prev =>
+                    prev.map(o => (o.id === opt.id ? { ...o, isLoadingImage: false } : o))
+                );
+            }
+        });
     };
 
-    fetchOptionImages(clothingOptions, setClothingOptions);
-    fetchOptionImages(hairstyleOptions, setHairstyleOptions);
-    fetchOptionImages(accessoryOptions, setAccessoryOptions);
+    fetchImagesForList(clothingOptions, setClothingOptions);
+    fetchImagesForList(hairstyleOptions, setHairstyleOptions);
+    fetchImagesForList(accessoryOptions, setAccessoryOptions);
 
-    const generateInitialCharacterImage = async () => {
-      setIsLoadingMainCharacterImage(true);
-      try {
-        const result = await generateImage({ prompt: "alien character" }); 
-        setCharacterImageUrl(result.imageDataUri);
-      } catch (error) {
-        console.error("Failed to generate main character image:", error);
-      } finally {
+    const generateMainCharacterImage = async () => {
+      if (characterImageUrl.startsWith('https://placehold.co') && isLoadingMainCharacterImage) {
+        try {
+          const result = await generateImage({ prompt: "cute alien character simple" }); 
+          setCharacterImageUrl(result.imageDataUri);
+        } catch (error) {
+          console.error("Failed to generate main character image:", error);
+        } finally {
+          setIsLoadingMainCharacterImage(false);
+        }
+      } else if (!characterImageUrl.startsWith('https://placehold.co') && isLoadingMainCharacterImage) {
         setIsLoadingMainCharacterImage(false);
       }
     };
-    generateInitialCharacterImage();
+
+    if (isLoadingMainCharacterImage) {
+        generateMainCharacterImage();
+    }
   }, []);
 
 
@@ -130,8 +152,9 @@ export default function AnpassaVarelsePage() {
         <OptionCard
           key={opt.id}
           name={opt.name}
-          imageUrl={opt.isLoadingImage ? 'https://placehold.co/100x100.png' : opt.imageUrl}
+          imageUrl={opt.imageUrl}
           imageHint={opt.imageHint}
+          isLoadingImage={opt.isLoadingImage}
           isSelected={selected === opt.id}
           onSelect={() => setSelected(opt.id)}
         />
@@ -153,7 +176,7 @@ export default function AnpassaVarelsePage() {
                 {isLoadingMainCharacterImage ? (
                    <LoadingSpinner size="lg"/>
                 ) : (
-                  <Image src={characterImageUrl} alt="Rymdvarelse" width={300} height={400} className="rounded-lg object-cover shadow-lg border-2 border-primary" data-ai-hint="alien character" />
+                  <Image src={characterImageUrl} alt="Rymdvarelse" width={300} height={400} className="rounded-lg object-cover shadow-lg border-2 border-primary" data-ai-hint="cute alien character simple" />
                 )}
               </CardContent>
             </Card>
