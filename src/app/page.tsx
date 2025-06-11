@@ -5,6 +5,8 @@ import { useState, useEffect } from 'react';
 import { Users, Rocket, Globe2 } from 'lucide-react';
 import Image from 'next/image';
 import { MainMenuButton } from '@/components/game/MainMenuButton';
+import { generateImage } from '@/ai/flows/generate-image-flow';
+import { LoadingSpinner } from '@/components/game/LoadingSpinner';
 
 interface StoredCharacter {
   name: string;
@@ -15,8 +17,8 @@ interface StoredCharacter {
 
 interface StoredSpaceship {
   imageUrl: string;
-  backstory: string | null; 
-  style: string | null; 
+  backstory: string | null;
+  style: string | null;
   parts: {
     wing: string | null;
     engine: string | null;
@@ -31,11 +33,13 @@ interface StoredSpaceship {
 
 const CHARACTER_STORAGE_KEY = "kosmoskids_character";
 const SPACESHIP_STORAGE_KEY = "kosmoskids_spaceship";
+const LOGO_STORAGE_KEY = "kosmoskids_logo";
 
 export default function Home() {
   const [characterData, setCharacterData] = useState<StoredCharacter | null>(null);
   const [spaceshipData, setSpaceshipData] = useState<StoredSpaceship | null>(null);
-  const [logoUrl] = useState<string>("https://placehold.co/200x200/2E3192/FFFFFF.png"); // Updated placeholder
+  const [logoImageUrl, setLogoImageUrl] = useState<string | null>(null);
+  const [isLoadingLogo, setIsLoadingLogo] = useState<boolean>(false);
 
   useEffect(() => {
     const storedCharacterRaw = localStorage.getItem(CHARACTER_STORAGE_KEY);
@@ -44,7 +48,7 @@ export default function Home() {
         setCharacterData(JSON.parse(storedCharacterRaw));
       } catch (e) {
         console.error("Failed to parse stored character data", e);
-        localStorage.removeItem(CHARACTER_STORAGE_KEY); 
+        localStorage.removeItem(CHARACTER_STORAGE_KEY);
       }
     }
 
@@ -54,8 +58,28 @@ export default function Home() {
         setSpaceshipData(JSON.parse(storedSpaceshipRaw));
       } catch (e) {
         console.error("Failed to parse stored spaceship data", e);
-        localStorage.removeItem(SPACESHIP_STORAGE_KEY); 
+        localStorage.removeItem(SPACESHIP_STORAGE_KEY);
       }
+    }
+
+    const storedLogoUrl = localStorage.getItem(LOGO_STORAGE_KEY);
+    if (storedLogoUrl) {
+      setLogoImageUrl(storedLogoUrl);
+    } else {
+      setIsLoadingLogo(true);
+      generateImage({ prompt: "planet logo space kids game vibrant colors" })
+        .then(result => {
+          setLogoImageUrl(result.imageDataUri);
+          localStorage.setItem(LOGO_STORAGE_KEY, result.imageDataUri);
+        })
+        .catch(error => {
+          console.error("Failed to generate logo image:", error);
+          // Fallback to a placeholder if generation fails
+          setLogoImageUrl("https://placehold.co/200x200/2E3192/FFFFFF.png?text=Kosmos");
+        })
+        .finally(() => {
+          setIsLoadingLogo(false);
+        });
     }
   }, []);
 
@@ -63,14 +87,29 @@ export default function Home() {
     <div className="flex flex-col items-center justify-center min-h-screen p-4 md:p-8 bg-gradient-to-br from-background to-indigo-900/50">
       <header className="text-center mb-12">
          <div className="relative w-40 h-40 mx-auto mb-4">
-            <Image 
-                src={logoUrl}
-                alt="Kosmoskids Logotyp" 
+            {isLoadingLogo && !logoImageUrl ? (
+              <div className="w-full h-full flex items-center justify-center bg-muted/50 rounded-full">
+                <LoadingSpinner size="lg" />
+              </div>
+            ) : logoImageUrl ? (
+              <Image
+                  src={logoImageUrl}
+                  alt="Kosmoskids Logotyp"
+                  width={200}
+                  height={200}
+                  className="rounded-full object-contain"
+              />
+            ) : (
+              // Fallback placeholder if everything fails
+              <Image
+                src="https://placehold.co/200x200/2E3192/FFFFFF.png?text=Logo"
+                alt="Kosmoskids Logotyp Placeholder"
                 width={200}
                 height={200}
                 className="rounded-full object-contain"
-                data-ai-hint="planet logo" 
+                data-ai-hint="planet logo"
             />
+            )}
         </div>
         <h1 className="text-5xl md:text-7xl font-headline font-bold text-primary animate-pulse">
           Kosmoskids
