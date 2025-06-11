@@ -41,6 +41,8 @@ interface StoredSpaceship {
 }
 
 const SPACESHIP_STORAGE_KEY = "kosmoskids_spaceship";
+const LOGO_STORAGE_KEY = "kosmoskids_logo";
+const PLANET_IMAGES_KEY = "kosmoskids_planet_images";
 
 const initialWingOptions: SpaceshipPartOption[] = [
   { id: 'wing1', name: 'Snabba Vingar' },
@@ -122,16 +124,16 @@ export default function AnpassaSkeppPage() {
     setIsLoadingSpaceshipBackstory(true);
     setSpaceshipBackstory(null);
 
-    const wingName = wingOptions.find(opt => opt.id === selectedWings)?.name || "standardvingar";
-    const engineName = engineOptions.find(opt => opt.id === selectedEngine)?.name || "standardmotor";
-    const decorationName = decorationOptions.find(opt => opt.id === selectedDecoration)?.name;
+    const wingNameStr = wingOptions.find(opt => opt.id === selectedWings)?.name || "standardvingar";
+    const engineNameStr = engineOptions.find(opt => opt.id === selectedEngine)?.name || "standardmotor";
+    const decorationNameStr = decorationOptions.find(opt => opt.id === selectedDecoration)?.name;
 
     try {
       const input: GenerateSpaceshipBackstoryInput = {
         spaceshipStyle: selectedSpaceshipStyle,
-        wingName,
-        engineName,
-        decorationName: decorationName,
+        wingName: wingNameStr,
+        engineName: engineNameStr,
+        decorationName: decorationNameStr,
       };
       const result = await generateSpaceshipBackstory(input);
       setSpaceshipBackstory(result.backstory);
@@ -163,9 +165,9 @@ export default function AnpassaSkeppPage() {
     }
 
     setIsLoadingMainSpaceshipImage(true);
-    setIsLoadingSpaceshipName(true); // Start loading name
+    setIsLoadingSpaceshipName(true); 
     setSpaceshipImageUrl(null);
-    // setSpaceshipName(null); // Optionally clear old name
+    
 
     const wingNameStr = wingOptions.find(opt => opt.id === selectedWings)?.name || "standardvingar";
     const engineNameStr = engineOptions.find(opt => opt.id === selectedEngine)?.name || "standardmotor";
@@ -174,7 +176,7 @@ export default function AnpassaSkeppPage() {
     let currentSpaceshipName = spaceshipName;
 
     try {
-      // Generate name first
+      
       const nameInput: GenerateSpaceshipNameInput = {
         spaceshipStyle: selectedSpaceshipStyle,
         wingName: wingNameStr,
@@ -186,7 +188,7 @@ export default function AnpassaSkeppPage() {
       setSpaceshipName(currentSpaceshipName);
       setIsLoadingSpaceshipName(false);
 
-      // Then generate image
+      
       let prompt = `Skapa en bild av ett rymdskepp vid namn "${currentSpaceshipName}".
       Vingar: ${wingNameStr}.
       Motor: ${engineNameStr}.
@@ -199,10 +201,7 @@ export default function AnpassaSkeppPage() {
 
       const imageResult = await generateImage({ prompt });
       setSpaceshipImageUrl(imageResult.imageDataUri);
-      toast({
-        title: "Skepp Skapat!",
-        description: `Ditt unika rymdskepp "${currentSpaceshipName}" är redo! Det är sparat lokalt.`,
-      });
+      
 
       const spaceshipToStore: StoredSpaceship = {
         name: currentSpaceshipName,
@@ -216,7 +215,59 @@ export default function AnpassaSkeppPage() {
         },
         partNames: { wingName: wingNameStr, engineName: engineNameStr, decorationName: decorationNameStr }
       };
-      localStorage.setItem(SPACESHIP_STORAGE_KEY, JSON.stringify(spaceshipToStore));
+      const spaceshipDataString = JSON.stringify(spaceshipToStore);
+
+      try {
+        localStorage.setItem(SPACESHIP_STORAGE_KEY, spaceshipDataString);
+        toast({
+          title: "Skepp Skapat & Sparat!",
+          description: `Ditt unika rymdskepp "${currentSpaceshipName}" är redo! Det är sparat lokalt.`,
+        });
+      } catch (e: any) {
+        if (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+          toast({
+            title: "Lagringsutrymme Nästan Fullt",
+            description: "Försöker frigöra utrymme och spara skeppet igen...",
+            variant: "default",
+            duration: 3000,
+          });
+          try {
+            localStorage.removeItem(LOGO_STORAGE_KEY);
+            localStorage.removeItem(PLANET_IMAGES_KEY);
+            
+            localStorage.setItem(SPACESHIP_STORAGE_KEY, spaceshipDataString); // Retry
+            toast({
+              title: "Skepp Sparat!",
+              description: `Ditt skepp "${currentSpaceshipName}" är sparat. Lite gammal data rensades.`,
+            });
+          } catch (e2: any) {
+            if (e2.name === 'QuotaExceededError' || e2.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+              console.error("Quota exceeded for spaceship even after clearing cache:", e2);
+              toast({
+                title: "Lagringsutrymme Fullt",
+                description: `Kunde inte spara "${currentSpaceshipName}". Rensa webbläsardata eller starta om spelet.`,
+                variant: "destructive",
+                duration: 7000,
+              });
+            } else {
+              console.error("Error saving spaceship after clearing cache:", e2);
+              toast({
+                title: "Fel vid Sparning",
+                description: "Ett oväntat fel uppstod när skeppet skulle sparas efter rensning.",
+                variant: "destructive",
+              });
+            }
+          }
+        } else {
+          console.error("Failed to save spaceship to localStorage:", e);
+          toast({
+            title: "Fel vid Sparning",
+            description: "Ett oväntat fel uppstod när skeppet skulle sparas.",
+            variant: "destructive",
+          });
+        }
+      }
+
 
     } catch (error) {
       console.error("Failed to generate spaceship name or image:", error);

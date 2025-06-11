@@ -33,6 +33,9 @@ interface StoredCharacter {
 }
 
 const CHARACTER_STORAGE_KEY = "kosmoskids_character";
+const LOGO_STORAGE_KEY = "kosmoskids_logo";
+const PLANET_IMAGES_KEY = "kosmoskids_planet_images";
+
 
 const initialClothingOptions: CustomizationOption[] = [
   { id: 'suit1', name: 'Rymddräkt Alfa' },
@@ -118,7 +121,7 @@ export default function AnpassaVarelsePage() {
     setIsLoadingBackstory(true);
     setBackstory(null);
     
-    const currentName = generateAndSetCharacterName(); // Generate name if not already set
+    const currentName = generateAndSetCharacterName(); 
 
     try {
       const input: GenerateCharacterBackstoryInput = { 
@@ -157,22 +160,22 @@ export default function AnpassaVarelsePage() {
     setIsLoadingMainCharacterImage(true);
     setCharacterImageUrl(null);
 
-    const currentName = characterName || generateAndSetCharacterName(); // Ensure name is set
-    if (!currentName) { // Should not happen if generateAndSetCharacterName works correctly
+    const currentName = characterName || generateAndSetCharacterName(); 
+    if (!currentName) { 
         toast({ title: "Namn saknas", description: "Kunde inte skapa ett namn.", variant: "destructive" });
         setIsLoadingMainCharacterImage(false);
         return;
     }
 
 
-    const clothingName = clothingOptions.find(opt => opt.id === selectedClothing)?.name || "standardklädsel";
-    const hairstyleName = hairstyleOptions.find(opt => opt.id === selectedHairstyle)?.name || "standardfrisyr";
-    const accessoryName = accessoryOptions.find(opt => opt.id === selectedAccessory)?.name || "inga tillbehör";
+    const clothingNameStr = clothingOptions.find(opt => opt.id === selectedClothing)?.name || "standardklädsel";
+    const hairstyleNameStr = hairstyleOptions.find(opt => opt.id === selectedHairstyle)?.name || "standardfrisyr";
+    const accessoryNameStr = accessoryOptions.find(opt => opt.id === selectedAccessory)?.name || "inga tillbehör";
 
     let prompt = `Skapa en bild av en rymdvarelse vid namn ${currentName}. Varelsen är ${selectedCharacterStyle.toLowerCase()}. `;
-    prompt += `Klädsel: ${clothingName}. `;
-    prompt += `Frisyr: ${hairstyleName}. `;
-    prompt += `Tillbehör: ${accessoryName}. `;
+    prompt += `Klädsel: ${clothingNameStr}. `;
+    prompt += `Frisyr: ${hairstyleNameStr}. `;
+    prompt += `Tillbehör: ${accessoryNameStr}. `;
     if (backstory) {
       prompt += `Bakgrundshistoria: ${backstory}. `;
     }
@@ -181,12 +184,7 @@ export default function AnpassaVarelsePage() {
     try {
       const result = await generateImage({ prompt }); 
       setCharacterImageUrl(result.imageDataUri);
-      toast({
-        title: "Varelse Skapad!",
-        description: `Här är ${currentName}! Den är sparad lokalt.`,
-      });
-      
-      // Save to localStorage
+            
       const characterToStore: StoredCharacter = {
         name: currentName,
         imageUrl: result.imageDataUri,
@@ -196,7 +194,58 @@ export default function AnpassaVarelsePage() {
         hairstyle: selectedHairstyle,
         accessory: selectedAccessory,
       };
-      localStorage.setItem(CHARACTER_STORAGE_KEY, JSON.stringify(characterToStore));
+      const characterDataString = JSON.stringify(characterToStore);
+
+      try {
+        localStorage.setItem(CHARACTER_STORAGE_KEY, characterDataString);
+        toast({
+          title: "Varelse Skapad & Sparad!",
+          description: `Här är ${currentName}! Den är sparad lokalt.`,
+        });
+      } catch (e: any) {
+        if (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+          toast({
+            title: "Lagringsutrymme Nästan Fullt",
+            description: "Försöker frigöra utrymme och spara igen...",
+            variant: "default",
+            duration: 3000,
+          });
+          try {
+            localStorage.removeItem(LOGO_STORAGE_KEY);
+            localStorage.removeItem(PLANET_IMAGES_KEY);
+            
+            localStorage.setItem(CHARACTER_STORAGE_KEY, characterDataString); // Retry
+            toast({
+              title: "Varelse Sparad!",
+              description: `${currentName} är sparad. Lite gammal data rensades för att göra plats.`,
+            });
+          } catch (e2: any) {
+            if (e2.name === 'QuotaExceededError' || e2.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+              console.error("Quota exceeded even after clearing cache:", e2);
+              toast({
+                title: "Lagringsutrymme Fullt",
+                description: `Kunde inte spara ${currentName}. Rensa webbläsardata eller starta om spelet.`,
+                variant: "destructive",
+                duration: 7000,
+              });
+            } else {
+              console.error("Error saving character after clearing cache:", e2);
+              toast({
+                title: "Fel vid Sparning",
+                description: "Ett oväntat fel uppstod när varelsen skulle sparas efter rensning.",
+                variant: "destructive",
+              });
+            }
+          }
+        } else {
+          console.error("Failed to save character to localStorage:", e);
+          toast({
+            title: "Fel vid Sparning",
+            description: "Ett oväntat fel uppstod när varelsen skulle sparas.",
+            variant: "destructive",
+          });
+        }
+      }
 
     } catch (error) {
       console.error("Failed to generate main character image:", error);
@@ -211,7 +260,7 @@ export default function AnpassaVarelsePage() {
   };
 
   const renderOptionGrid = (options: CustomizationOption[], selected: string | null, setSelected: (id: string) => void, currentActiveTab: string, tabName: string) => {
-     if (currentActiveTab !== tabName && !options.some(opt => selected === opt.id)) return null; // Don't render if not active and no selection made for this tab
+     if (currentActiveTab !== tabName && !options.some(opt => selected === opt.id)) return null;
 
     return (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-1">
@@ -333,4 +382,3 @@ export default function AnpassaVarelsePage() {
     </div>
   );
 }
-
