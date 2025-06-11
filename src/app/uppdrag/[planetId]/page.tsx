@@ -152,7 +152,7 @@ interface PlanetMissionPageProps {
 export default function PlanetMissionPage({ params }: PlanetMissionPageProps) {
   const { planetId } = use(params); 
   const currentPlanetDetails = allPlanetDefinitionsForLookup.find(p => p.id === planetId) || 
-                               { name: planetId, description: "En okänd plats i rymden...", imageHint: "mysterious space placeholder" };
+                               { id: planetId, name: planetId, description: "En okänd plats i rymden...", imageHint: "mysterious space placeholder", icon: Leaf, themeColor: 'bg-gray-500/30' };
 
 
   const [character, setCharacter] = useState<StoredCharacter | null>(null);
@@ -206,12 +206,17 @@ export default function PlanetMissionPage({ params }: PlanetMissionPageProps) {
         const activityResult = await generatePlanetActivity(activityInput);
         setActivityText(activityResult.activityText);
 
-        if (activityResult.imagePrompt) {
+        if (activityResult.imagePrompt && activityResult.imagePrompt.trim() !== "") {
           const imageResult = await generateImage({ prompt: activityResult.imagePrompt });
           setActivityImageUrl(imageResult.imageDataUri);
         } else {
-           // Use a placeholder or a generic image if no prompt is provided
-          setActivityImageUrl(`https://placehold.co/600x400/4A4A7F/FFFFFF.png?text=Bild+saknas`);
+           console.warn(`Image prompt was empty for planet ${currentPlanetDetails.name}. Using placeholder.`);
+           setActivityImageUrl(`https://placehold.co/600x400/2E3192/FFFFFF.png?text=Bild+kunde+inte+skapas`);
+           toast({
+            title: "Bildinformation Saknas",
+            description: `Kunde inte skapa en bild för äventyret på ${currentPlanetDetails.name} eftersom bildbeskrivningen saknades.`,
+            variant: "default"
+          });
         }
         
         const visitedPlanets: string[] = JSON.parse(localStorage.getItem(VISITED_PLANETS_STORAGE_KEY) || '[]');
@@ -226,7 +231,7 @@ export default function PlanetMissionPage({ params }: PlanetMissionPageProps) {
         setErrorState("Kunde inte ladda äventyret. Försök gå tillbaka och komma hit igen.");
         toast({
           title: "Ett fel uppstod",
-          description: "Kunde inte generera innehåll för planeten.",
+          description: "Kunde inte generera innehåll för planeten. Det kan bero på ett tillfälligt problem med AI-tjänsten.",
           variant: "destructive",
         });
       } finally {
@@ -236,7 +241,7 @@ export default function PlanetMissionPage({ params }: PlanetMissionPageProps) {
 
     fetchActivity();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [character, spaceship, planetId, currentPlanetDetails.name]); // Added currentPlanetDetails.name to dependencies for safety
+  }, [character, spaceship, planetId, currentPlanetDetails.name, currentPlanetDetails.description]);
 
   const pageTitle = currentPlanetDetails ? `Äventyr på ${currentPlanetDetails.name}` : "Laddar Äventyr...";
 
@@ -283,7 +288,7 @@ export default function PlanetMissionPage({ params }: PlanetMissionPageProps) {
               ) : (
                 <div className="w-full aspect-[4/3] flex items-center justify-center bg-muted rounded-lg border-2 border-dashed border-muted-foreground">
                   <ImageIcon className="h-24 w-24 text-muted-foreground" />
-                   <p className="text-muted-foreground ml-2">Laddar bild eller ingen bildprompt...</p>
+                   <p className="text-muted-foreground ml-2">Laddar bild...</p>
                 </div>
               )}
               <div className="bg-muted/50 p-4 rounded-md shadow">
@@ -304,5 +309,3 @@ export default function PlanetMissionPage({ params }: PlanetMissionPageProps) {
     </div>
   );
 }
-
-    
