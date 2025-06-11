@@ -35,7 +35,7 @@ const SPACESHIP_STORAGE_KEY = "kosmoskids_spaceship";
 export default function Home() {
   const [characterData, setCharacterData] = useState<StoredCharacter | null>(null);
   const [spaceshipData, setSpaceshipData] = useState<StoredSpaceship | null>(null);
-  const [logoUrl] = useState<string>("https://placehold.co/200x200.png");
+  const [logoUrl] = useState<string>("https://placehold.co/200x200/2E3192/FFFFFF.png"); // Updated placeholder
 
   useEffect(() => {
     const storedCharacterRaw = localStorage.getItem(CHARACTER_STORAGE_KEY);
@@ -57,8 +57,6 @@ export default function Home() {
         localStorage.removeItem(SPACESHIP_STORAGE_KEY); 
       }
     }
-    // For now, we use a static placeholder for the logo to reduce API calls.
-    // If AI generation for the logo is desired later, this can be re-enabled carefully.
   }, []);
 
   return (
