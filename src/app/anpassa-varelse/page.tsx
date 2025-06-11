@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -65,44 +66,35 @@ export default function AnpassaVarelsePage() {
   const [isLoadingMainCharacterImage, setIsLoadingMainCharacterImage] = useState(characterImageUrl.startsWith('https://placehold.co'));
 
   useEffect(() => {
-    const fetchImagesForList = (
-        list: CustomizationOption[],
-        setter: React.Dispatch<React.SetStateAction<CustomizationOption[]>>
+    const fetchOptionImage = async (
+      option: CustomizationOption,
+      setter: React.Dispatch<React.SetStateAction<CustomizationOption[]>>
     ) => {
-        list.forEach(opt => {
-            if (opt.imageUrl.startsWith('https://placehold.co') && opt.isLoadingImage) {
-                generateImage({ prompt: opt.imageHint })
-                    .then(result => {
-                        setter(prev =>
-                            prev.map(o =>
-                                o.id === opt.id
-                                    ? { ...o, imageUrl: result.imageDataUri, isLoadingImage: false }
-                                    : o
-                            )
-                        );
-                    })
-                    .catch(error => {
-                        console.error(`Failed to generate image for ${opt.name}:`, error);
-                        setter(prev =>
-                            prev.map(o =>
-                                o.id === opt.id ? { ...o, isLoadingImage: false } : o
-                            )
-                        );
-                    });
-            } else if (!opt.imageUrl.startsWith('https://placehold.co') && opt.isLoadingImage) {
-                 setter(prev =>
-                    prev.map(o => (o.id === opt.id ? { ...o, isLoadingImage: false } : o))
-                );
-            }
-        });
+      if (option.imageUrl.startsWith('https://placehold.co') && !option.isLoadingImage) {
+        setter(prev => prev.map(o => o.id === option.id ? { ...o, isLoadingImage: true } : o));
+        try {
+          const result = await generateImage({ prompt: option.imageHint });
+          setter(prev =>
+            prev.map(o =>
+              o.id === option.id
+                ? { ...o, imageUrl: result.imageDataUri, isLoadingImage: false }
+                : o
+            )
+          );
+        } catch (error) {
+          console.error(`Failed to generate image for ${option.name}:`, error);
+          setter(prev => prev.map(o => o.id === option.id ? { ...o, isLoadingImage: false } : o));
+        }
+      }
     };
 
-    fetchImagesForList(clothingOptions, setClothingOptions);
-    fetchImagesForList(hairstyleOptions, setHairstyleOptions);
-    fetchImagesForList(accessoryOptions, setAccessoryOptions);
+    clothingOptions.forEach(opt => fetchOptionImage(opt, setClothingOptions));
+    hairstyleOptions.forEach(opt => fetchOptionImage(opt, setHairstyleOptions));
+    accessoryOptions.forEach(opt => fetchOptionImage(opt, setAccessoryOptions));
 
     const generateMainCharacterImage = async () => {
-      if (characterImageUrl.startsWith('https://placehold.co') && isLoadingMainCharacterImage) {
+      if (characterImageUrl.startsWith('https://placehold.co') && !isLoadingMainCharacterImage) {
+        setIsLoadingMainCharacterImage(true);
         try {
           const result = await generateImage({ prompt: "cute alien character simple" }); 
           setCharacterImageUrl(result.imageDataUri);
@@ -111,14 +103,10 @@ export default function AnpassaVarelsePage() {
         } finally {
           setIsLoadingMainCharacterImage(false);
         }
-      } else if (!characterImageUrl.startsWith('https://placehold.co') && isLoadingMainCharacterImage) {
-        setIsLoadingMainCharacterImage(false);
       }
     };
 
-    if (isLoadingMainCharacterImage) {
-        generateMainCharacterImage();
-    }
+    generateMainCharacterImage();
   }, []);
 
 
@@ -180,8 +168,10 @@ export default function AnpassaVarelsePage() {
                 )}
               </CardContent>
             </Card>
-            
-            <Card className="w-full max-w-sm mt-6 shadow-xl bg-card/80 backdrop-blur-sm">
+          </div>
+
+          <div className="lg:col-span-2">
+            <Card className="w-full shadow-xl bg-card/80 backdrop-blur-sm mb-6">
               <CardHeader>
                 <CardTitle className="text-xl font-headline text-accent flex items-center gap-2"><Wand2 /> Bakgrundshistoria</CardTitle>
               </CardHeader>
@@ -209,9 +199,7 @@ export default function AnpassaVarelsePage() {
                 )}
               </CardContent>
             </Card>
-          </div>
 
-          <div className="lg:col-span-2">
             <Tabs defaultValue="clothes" className="w-full">
               <TabsList className="grid w-full grid-cols-3 bg-primary/20">
                 <TabsTrigger value="clothes" className="text-xs sm:text-sm data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"><Shirt className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5" />Kläder</TabsTrigger>
