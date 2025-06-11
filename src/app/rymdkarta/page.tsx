@@ -193,9 +193,6 @@ export default function RymdkartaPage() {
       for (const planetData of activePlanetDefinitions) {
         if (planetData.isLoadingImage && !storedPlanetImagesMap[planetData.id]) {
           try {
-             // Update specific planet to show it's loading NOW
-            setActivePlanetDefinitions(prevs => prevs.map(p => p.id === planetData.id ? {...p, isLoadingImage: true} : p));
-
             const result = await generateImage({ prompt: planetData.imageHint });
             
             storedPlanetImagesMap[planetData.id] = result.imageDataUri;
