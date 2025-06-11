@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, use } from 'react'; // Added 'use'
+import { useState, useEffect, use } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { GameHeader } from '@/components/layout/GameHeader';
@@ -13,9 +13,9 @@ import { useToast } from "@/hooks/use-toast";
 import { 
   generatePlanetActivity, 
   type GeneratePlanetActivityInput,
-  // type GeneratePlanetActivityOutput // Not used directly
 } from '@/ai/flows/generate-planet-activity';
 import { generateImage } from '@/ai/flows/generate-image-flow';
+import { Flame, Snowflake, Gem, Bot, Sun, Leaf, Telescope, Sprout, Cloud, Mountain } from 'lucide-react'; // Import all icons
 
 interface StoredCharacter {
   name: string;
@@ -44,29 +44,116 @@ interface StoredSpaceship {
   }
 }
 
+interface PlanetDefinition {
+  id: string;
+  name: string;
+  description: string;
+  imageHint: string;
+  icon: React.ElementType; // Not used here directly, but part of the full definition
+  themeColor: string; // Not used here directly
+}
+
 const CHARACTER_STORAGE_KEY = "kosmoskids_character";
 const SPACESHIP_STORAGE_KEY = "kosmoskids_spaceship";
 const VISITED_PLANETS_STORAGE_KEY = "kosmoskids_visited_planets";
 
-// Håll en lista med planetdata här, eller hämta från en central plats om det blir mer komplext
-// Detta är förenklat för nu. I en större app kan detta komma från en databas eller API.
-const planetDetails: Record<string, { name: string; description: string }> = {
-  'lavaplaneten-volcanis': { name: 'Lavaplaneten Volcanis', description: 'En glödhet planet täckt av vulkaner och lavafloder.' },
-  'isjatten-glacius': { name: 'Isjätten Glacius', description: 'En iskall värld med snötäckta berg och frusna sjöar.' },
-  'kristallgrottorna-på-xylar': { name: 'Kristallgrottorna på Xylar', description: 'Ett skimrande nätverk av grottor fyllda med glittrande kristaller.' },
-  'robotstaden-gearwerk': { name: 'Robotstaden Gearwerk', description: 'En högteknologisk stad bebodd av avancerade robotar.' },
-};
+// This should mirror the definitions in rymdkarta/page.tsx to ensure data consistency
+// In a larger app, this data would come from a shared service or context.
+const allPlanetDefinitionsForLookup: PlanetDefinition[] = [
+   {
+    id: 'lavaplaneten-volcanis',
+    name: 'Lavaplaneten Volcanis',
+    description: 'En glödhet planet täckt av vulkaner och lavafloder. Här bor de eldiga Flammisarna!',
+    imageHint: 'cartoon lava planet vibrant fire alien landscape orange red',
+    icon: Flame,
+    themeColor: 'bg-red-700/30 border-red-600 hover:shadow-red-500/50',
+  },
+  {
+    id: 'isjatten-glacius',
+    name: 'Isjätten Glacius',
+    description: 'En iskall värld med snötäckta berg och frusna sjöar. Islingarna trivs i kylan.',
+    imageHint: 'cartoon ice planet detailed snow creatures mountains light blue white',
+    icon: Snowflake,
+    themeColor: 'bg-blue-500/30 border-blue-400 hover:shadow-blue-400/50',
+  },
+  {
+    id: 'kristallgrottorna-xylar',
+    name: 'Kristallgrottorna på Xylar',
+    description: 'Ett skimrande nätverk av grottor fyllda med glittrande kristaller och mystiska väsen.',
+    imageHint: 'cartoon crystal cave planet glowing gems fantasy creatures purple amethyst',
+    icon: Gem,
+    themeColor: 'bg-purple-600/30 border-purple-500 hover:shadow-purple-500/50',
+  },
+  {
+    id: 'robotstaden-gearwerk',
+    name: 'Robotstaden Gearwerk',
+    description: 'En högteknologisk stad bebodd av avancerade robotar och flygande farkoster.',
+    imageHint: 'cartoon robot city futuristic flying vehicles shiny metal grey silver',
+    icon: Bot,
+    themeColor: 'bg-gray-600/30 border-gray-500 hover:shadow-gray-400/50',
+  },
+  {
+    id: 'solvindsoasen-helios',
+    name: 'Solvindsoasen Helios',
+    description: 'En planet badande i ljuset från tre solar, där växter samlar solenergi.',
+    imageHint: 'cartoon desert oasis planet three suns exotic plants solar panels yellow gold',
+    icon: Sun,
+    themeColor: 'bg-yellow-500/30 border-yellow-400 hover:shadow-yellow-400/50',
+  },
+  {
+    id: 'djungelvarlden-viridia',
+    name: 'Djungelvärlden Viridia',
+    description: 'En frodig planet täckt av enorma träd och exotiska djur. Luften är fuktig och full av liv.',
+    imageHint: 'cartoon jungle planet giant trees exotic creatures vibrant green bioluminescent',
+    icon: Leaf,
+    themeColor: 'bg-green-600/30 border-green-500 hover:shadow-green-500/50',
+  },
+  {
+    id: 'observatorieklippan-celestia',
+    name: 'Observatorieklippan Celestia',
+    description: 'En hög bergsplanet med klara nätter, perfekt för att studera stjärnor och galaxer.',
+    imageHint: 'cartoon mountain observatory planet clear night sky stars telescope purple darkblue',
+    icon: Telescope,
+    themeColor: 'bg-indigo-600/30 border-indigo-500 hover:shadow-indigo-500/50',
+  },
+  {
+    id: 'svampskogen-mycelia',
+    name: 'Svampskogen Mycelia',
+    description: 'En dunkel planet där jättelika, självlysande svampar bildar en hel skog.',
+    imageHint: 'cartoon giant mushroom forest glowing fungi bioluminescent dark eerie purple blue',
+    icon: Sprout,
+    themeColor: 'bg-teal-600/30 border-teal-500 hover:shadow-teal-500/50',
+  },
+   {
+    id: 'gasjatten-nimbus',
+    name: 'Gasjätten Nimbus',
+    description: 'En enorm gasplanet med virvlande molnband i olika färger och flytande öar.',
+    imageHint: 'cartoon gas giant planet swirling clouds floating islands pastel colors pink blue',
+    icon: Cloud,
+    themeColor: 'bg-sky-600/30 border-sky-500 hover:shadow-sky-500/50',
+  },
+  {
+    id: 'bergskedjan-apex',
+    name: 'Bergskedjan Apex',
+    description: 'En planet definierad av skyhöga, snöklädda bergstoppar och djupa, dolda dalar.',
+    imageHint: 'cartoon massive mountain range snowy peaks hidden valleys eagles flying majestic brown grey white',
+    icon: Mountain,
+    themeColor: 'bg-stone-600/30 border-stone-500 hover:shadow-stone-500/50',
+  }
+];
 
 
 interface PlanetMissionPageProps {
-  params: Promise<{ // params is a Promise
+  params: Promise<{ 
     planetId: string;
   }>;
 }
 
 export default function PlanetMissionPage({ params }: PlanetMissionPageProps) {
-  const { planetId } = use(params); // Use React.use() to unwrap params
-  const currentPlanetInfo = planetDetails[planetId] || { name: planetId, description: "En okänd plats i rymden..." };
+  const { planetId } = use(params); 
+  const currentPlanetDetails = allPlanetDefinitionsForLookup.find(p => p.id === planetId) || 
+                               { name: planetId, description: "En okänd plats i rymden...", imageHint: "mysterious space placeholder" };
+
 
   const [character, setCharacter] = useState<StoredCharacter | null>(null);
   const [spaceship, setSpaceship] = useState<StoredSpaceship | null>(null);
@@ -99,15 +186,17 @@ export default function PlanetMissionPage({ params }: PlanetMissionPageProps) {
   }, []);
 
   useEffect(() => {
-    if (!character || !spaceship || !planetId) return;
+    if (!character || !spaceship || !planetId || !currentPlanetDetails) return;
 
     const fetchActivity = async () => {
       setIsLoadingContent(true);
       setErrorState(null);
+      setActivityText(null);
+      setActivityImageUrl(null);
       try {
         const activityInput: GeneratePlanetActivityInput = {
-          planetName: currentPlanetInfo.name,
-          planetDescription: currentPlanetInfo.description,
+          planetName: currentPlanetDetails.name,
+          planetDescription: currentPlanetDetails.description,
           characterName: character.name,
           characterStyle: character.style,
           characterBackstory: character.backstory,
@@ -121,16 +210,16 @@ export default function PlanetMissionPage({ params }: PlanetMissionPageProps) {
           const imageResult = await generateImage({ prompt: activityResult.imagePrompt });
           setActivityImageUrl(imageResult.imageDataUri);
         } else {
-          setActivityImageUrl(null); // No prompt, no image
+           // Use a placeholder or a generic image if no prompt is provided
+          setActivityImageUrl(`https://placehold.co/600x400/4A4A7F/FFFFFF.png?text=Bild+saknas`);
         }
         
-        // Mark planet as visited
         const visitedPlanets: string[] = JSON.parse(localStorage.getItem(VISITED_PLANETS_STORAGE_KEY) || '[]');
         if (!visitedPlanets.includes(planetId)) {
           visitedPlanets.push(planetId);
           localStorage.setItem(VISITED_PLANETS_STORAGE_KEY, JSON.stringify(visitedPlanets));
         }
-        toast({ title: "Uppdrag Utfört!", description: `Du har nu utforskat ${currentPlanetInfo.name}.` });
+        toast({ title: "Uppdrag Utfört!", description: `Du har nu utforskat ${currentPlanetDetails.name}.` });
 
       } catch (err) {
         console.error("Failed to generate planet activity or image:", err);
@@ -147,17 +236,18 @@ export default function PlanetMissionPage({ params }: PlanetMissionPageProps) {
 
     fetchActivity();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [character, spaceship, planetId]); // currentPlanetInfo is derived from planetId
+  }, [character, spaceship, planetId, currentPlanetDetails.name]); // Added currentPlanetDetails.name to dependencies for safety
 
+  const pageTitle = currentPlanetDetails ? `Äventyr på ${currentPlanetDetails.name}` : "Laddar Äventyr...";
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-background to-indigo-900/60">
-      <GameHeader title={`Äventyr på ${currentPlanetInfo.name}`} backHref="/rymdkarta" />
+      <GameHeader title={pageTitle} backHref="/rymdkarta" />
       <main className="flex-grow container mx-auto px-4 py-8 flex flex-col items-center">
         {isLoadingContent && (
           <div className="flex flex-col items-center justify-center h-full">
             <LoadingSpinner size="lg" />
-            <p className="mt-4 text-xl text-foreground">Förbereder ditt äventyr på {currentPlanetInfo.name}...</p>
+            <p className="mt-4 text-xl text-foreground">Förbereder ditt äventyr på {currentPlanetDetails.name}...</p>
           </div>
         )}
 
@@ -182,17 +272,18 @@ export default function PlanetMissionPage({ params }: PlanetMissionPageProps) {
           <Card className="w-full max-w-2xl shadow-2xl bg-card/90 backdrop-blur-md">
             <CardHeader>
               <CardTitle className="text-3xl font-headline text-primary text-center">
-                {character?.name} på {currentPlanetInfo.name}
+                {character?.name} på {currentPlanetDetails.name}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6 p-4 md:p-8">
               {activityImageUrl ? (
                 <div className="w-full aspect-[4/3] relative rounded-lg overflow-hidden shadow-lg border-2 border-accent bg-muted">
-                  <Image src={activityImageUrl} alt={`Äventyr på ${currentPlanetInfo.name}`} layout="fill" objectFit="cover" />
+                  <Image src={activityImageUrl} alt={`Äventyr på ${currentPlanetDetails.name}`} layout="fill" objectFit="cover" />
                 </div>
               ) : (
-                <div className="w-full aspect-[4/3] flex items-center justify-center bg-muted rounded-lg">
+                <div className="w-full aspect-[4/3] flex items-center justify-center bg-muted rounded-lg border-2 border-dashed border-muted-foreground">
                   <ImageIcon className="h-24 w-24 text-muted-foreground" />
+                   <p className="text-muted-foreground ml-2">Laddar bild eller ingen bildprompt...</p>
                 </div>
               )}
               <div className="bg-muted/50 p-4 rounded-md shadow">
@@ -214,3 +305,4 @@ export default function PlanetMissionPage({ params }: PlanetMissionPageProps) {
   );
 }
 
+    

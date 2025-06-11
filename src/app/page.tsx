@@ -39,6 +39,10 @@ interface StoredSpaceship {
 const CHARACTER_STORAGE_KEY = "kosmoskids_character";
 const SPACESHIP_STORAGE_KEY = "kosmoskids_spaceship";
 const LOGO_STORAGE_KEY = "kosmoskids_logo";
+const ACTIVE_PLANET_IDS_KEY = "kosmoskids_active_planet_ids";
+const PLANET_IMAGES_KEY = "kosmoskids_planet_images";
+const VISITED_PLANETS_KEY = "kosmoskids_visited_planets";
+
 
 export default function Home() {
   const [characterData, setCharacterData] = useState<StoredCharacter | null>(null);
@@ -91,11 +95,31 @@ export default function Home() {
   const handleStartOver = () => {
     localStorage.removeItem(CHARACTER_STORAGE_KEY);
     localStorage.removeItem(SPACESHIP_STORAGE_KEY);
+    localStorage.removeItem(LOGO_STORAGE_KEY); // Also clear logo to allow regeneration if desired
+    localStorage.removeItem(ACTIVE_PLANET_IDS_KEY);
+    localStorage.removeItem(PLANET_IMAGES_KEY);
+    localStorage.removeItem(VISITED_PLANETS_KEY);
+
     setCharacterData(null);
     setSpaceshipData(null);
+    setLogoImageUrl(null); // Clear logo from state so it attempts to reload/regenerate
+    setIsLoadingLogo(true); // Trigger loading state for logo
+     generateImage({ prompt: "planet logo space kids game vibrant colors" }) // Re-trigger logo generation
+        .then(result => {
+          setLogoImageUrl(result.imageDataUri);
+          localStorage.setItem(LOGO_STORAGE_KEY, result.imageDataUri);
+        })
+        .catch(error => {
+          console.error("Failed to generate logo image:", error);
+          setLogoImageUrl("https://placehold.co/200x200/2E3192/FFFFFF.png?text=Kosmos");
+        })
+        .finally(() => {
+          setIsLoadingLogo(false);
+        });
+
     toast({
-      title: "Börjat Om!",
-      description: "Din varelse och ditt skepp har återställts.",
+      title: "Spelet Återställt!",
+      description: "Din varelse, skepp och utforskningsframsteg har nollställts. Nya planeter väntar!",
       variant: "default"
     });
   };
@@ -119,7 +143,7 @@ export default function Home() {
                   className="rounded-full object-contain"
                   data-ai-hint="planet logo"
               />
-            ) : (
+            ) : ( // Fallback if logoImageUrl is null AND not loading (e.g. initial state before useEffect)
               <Image
                 src="https://placehold.co/200x200/2E3192/FFFFFF.png?text=Kosmos"
                 alt="Kosmoskids Logotyp Placeholder"
@@ -194,7 +218,7 @@ export default function Home() {
         <div className="mt-10 w-full max-w-xs mx-auto">
             <Button variant="outline" onClick={handleStartOver} className="w-full font-semibold border-accent hover:bg-accent/20 hover:text-accent-foreground">
             <RotateCcw className="mr-2 h-5 w-5" />
-            Börja Om
+            Börja Om Spelet
             </Button>
         </div>
       )}
@@ -205,3 +229,5 @@ export default function Home() {
     </div>
   );
 }
+
+    
