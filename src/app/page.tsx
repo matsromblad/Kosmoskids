@@ -35,7 +35,7 @@ const SPACESHIP_STORAGE_KEY = "kosmoskids_spaceship";
 export default function Home() {
   const [characterData, setCharacterData] = useState<StoredCharacter | null>(null);
   const [spaceshipData, setSpaceshipData] = useState<StoredSpaceship | null>(null);
-  const [logoUrl, setLogoUrl] = useState<string>("https://placehold.co/200x200.png");
+  const [logoUrl] = useState<string>("https://placehold.co/200x200.png");
 
   useEffect(() => {
     const storedCharacterRaw = localStorage.getItem(CHARACTER_STORAGE_KEY);
@@ -59,7 +59,6 @@ export default function Home() {
     }
     // For now, we use a static placeholder for the logo to reduce API calls.
     // If AI generation for the logo is desired later, this can be re-enabled carefully.
-    // e.g., by calling generateImage({prompt: "cute alien planet logo"}) and setting setLogoUrl
   }, []);
 
   return (
@@ -72,7 +71,7 @@ export default function Home() {
                 width={200}
                 height={200}
                 className="rounded-full object-contain"
-                // data-ai-hint="cute alien planet logo" // Removed to prevent AI generation for logo
+                data-ai-hint="planet logo" 
             />
         </div>
         <h1 className="text-5xl md:text-7xl font-headline font-bold text-primary animate-pulse">
