@@ -230,7 +230,9 @@ export default function AnpassaVarelsePage() {
       console.error("Error generating backstory:", error);
       let desc = "Kunde inte generera bakgrundshistoria. Skapar varelse utan.";
        if (error.message && (error.message.includes("503") || error.message.toLowerCase().includes("overloaded"))) {
-        desc = "AI-tjänsten för att skapa historier är upptagen. Skapar varelse utan historia.";
+        desc = "AI-tjänsten för att skapa historier är upptagen. Skapar varelse utan historia. Prova igen om en stund!";
+      } else if (error.message && error.message.toLowerCase().includes("quota")) {
+        desc = "AI-tjänsten har nått sin kvot för idag. Skapar varelse utan historia.";
       }
       toast({ title: "Fel vid Historiegenerering", description: desc, variant: "default" });
     } finally {
@@ -482,3 +484,6 @@ export default function AnpassaVarelsePage() {
     </div>
   );
 }
+
+
+    
