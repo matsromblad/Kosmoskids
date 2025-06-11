@@ -3,7 +3,8 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { Shirt, Sparkles, Puzzle, Wand2, RocketIcon } from 'lucide-react';
+import Link from 'next/link';
+import { Shirt, Sparkles, Puzzle, Wand2, RocketIcon, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -104,6 +105,8 @@ export default function AnpassaVarelsePage() {
 
 
   const generateAndSetCharacterName = (): string => {
+    if (characterName) return characterName; // Don't generate if already exists
+
     const randomPrefix = spacePrefixes[Math.floor(Math.random() * spacePrefixes.length)];
     const randomDaughterName = daughterNames[Math.floor(Math.random() * daughterNames.length)];
     const newName = `${randomPrefix}${randomDaughterName}`;
@@ -115,7 +118,7 @@ export default function AnpassaVarelsePage() {
     setIsLoadingBackstory(true);
     setBackstory(null);
     
-    const currentName = characterName || generateAndSetCharacterName();
+    const currentName = generateAndSetCharacterName(); // Generate name if not already set
 
     try {
       const input: GenerateCharacterBackstoryInput = { 
@@ -142,10 +145,25 @@ export default function AnpassaVarelsePage() {
   };
 
   const handleCreateCharacterImage = async () => {
+    if (!selectedClothing || !selectedHairstyle) {
+      toast({
+        title: "Val Saknas",
+        description: "Välj åtminstone kläder och frisyr för din varelse.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setIsLoadingMainCharacterImage(true);
     setCharacterImageUrl(null);
 
-    const currentName = characterName || generateAndSetCharacterName();
+    const currentName = characterName || generateAndSetCharacterName(); // Ensure name is set
+    if (!currentName) { // Should not happen if generateAndSetCharacterName works correctly
+        toast({ title: "Namn saknas", description: "Kunde inte skapa ett namn.", variant: "destructive" });
+        setIsLoadingMainCharacterImage(false);
+        return;
+    }
+
 
     const clothingName = clothingOptions.find(opt => opt.id === selectedClothing)?.name || "standardklädsel";
     const hairstyleName = hairstyleOptions.find(opt => opt.id === selectedHairstyle)?.name || "standardfrisyr";
@@ -165,7 +183,7 @@ export default function AnpassaVarelsePage() {
       setCharacterImageUrl(result.imageDataUri);
       toast({
         title: "Varelse Skapad!",
-        description: `Här är ${currentName}! Glöm inte att spara.`,
+        description: `Här är ${currentName}! Den är sparad lokalt.`,
       });
       
       // Save to localStorage
@@ -192,18 +210,22 @@ export default function AnpassaVarelsePage() {
     }
   };
 
-  const renderOptionGrid = (options: CustomizationOption[], selected: string | null, setSelected: (id: string) => void) => (
-    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-1">
-      {options.map(opt => (
-        <OptionCard
-          key={opt.id}
-          name={opt.name}
-          isSelected={selected === opt.id}
-          onSelect={() => setSelected(opt.id)}
-        />
-      ))}
-    </div>
-  );
+  const renderOptionGrid = (options: CustomizationOption[], selected: string | null, setSelected: (id: string) => void, currentActiveTab: string, tabName: string) => {
+     if (currentActiveTab !== tabName && !options.some(opt => selected === opt.id)) return null; // Don't render if not active and no selection made for this tab
+
+    return (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-1">
+        {options.map(opt => (
+            <OptionCard
+            key={opt.id}
+            name={opt.name}
+            isSelected={selected === opt.id}
+            onSelect={() => setSelected(opt.id)}
+            />
+        ))}
+        </div>
+    );
+ };
   
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-background to-indigo-900/30">
@@ -235,7 +257,7 @@ export default function AnpassaVarelsePage() {
           <div className="lg:col-span-2">
              <Card className="w-full shadow-xl bg-card/80 backdrop-blur-sm mb-6">
               <CardHeader>
-                <CardTitle className="text-xl font-headline text-accent flex items-center gap-2"><Wand2 /> Bakgrundshistoria & Namn</CardTitle>
+                <CardTitle className="text-xl font-headline text-accent flex items-center gap-2"><Wand2 /> Bakgrundshistoria &amp; Namn</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
@@ -252,7 +274,7 @@ export default function AnpassaVarelsePage() {
                   </Select>
                 </div>
                 <Button onClick={handleGenerateBackstory} disabled={isLoadingBackstory} className="w-full font-semibold" variant="secondary">
-                  {isLoadingBackstory ? <LoadingSpinner size="sm" /> : (characterName ? 'Skapa Ny Historia' : 'Ge Namn & Skapa Historia')}
+                  {isLoadingBackstory ? <LoadingSpinner size="sm" /> : (characterName ? 'Skapa Ny Historia' : 'Ge Namn &amp; Skapa Historia')}
                 </Button>
                 {backstory && (
                   <ScrollArea className="h-32 mt-2 p-3 border rounded-md bg-muted/50 text-sm text-foreground">
@@ -272,34 +294,43 @@ export default function AnpassaVarelsePage() {
                 <TabsContent value="clothes" forceMount={activeTab === "clothes"}>
                   <Card className="bg-card/70 backdrop-blur-sm border-0 shadow-none">
                     <CardHeader><CardTitle className="text-lg text-primary">Välj Kläder</CardTitle></CardHeader>
-                    <CardContent>{renderOptionGrid(clothingOptions, selectedClothing, setSelectedClothing)}</CardContent>
+                    <CardContent>{renderOptionGrid(clothingOptions, selectedClothing, setSelectedClothing, activeTab, "clothes")}</CardContent>
                   </Card>
                 </TabsContent>
                 <TabsContent value="hairstyles" forceMount={activeTab === "hairstyles"}>
                    <Card className="bg-card/70 backdrop-blur-sm border-0 shadow-none">
                     <CardHeader><CardTitle className="text-lg text-primary">Välj Frisyr</CardTitle></CardHeader>
-                    <CardContent>{renderOptionGrid(hairstyleOptions, selectedHairstyle, setSelectedHairstyle)}</CardContent>
+                    <CardContent>{renderOptionGrid(hairstyleOptions, selectedHairstyle, setSelectedHairstyle, activeTab, "hairstyles")}</CardContent>
                   </Card>
                 </TabsContent>
                 <TabsContent value="accessories" forceMount={activeTab === "accessories"}>
                    <Card className="bg-card/70 backdrop-blur-sm border-0 shadow-none">
                     <CardHeader><CardTitle className="text-lg text-primary">Välj Tillbehör</CardTitle></CardHeader>
-                    <CardContent>{renderOptionGrid(accessoryOptions, selectedAccessory, setSelectedAccessory)}</CardContent>
+                    <CardContent>{renderOptionGrid(accessoryOptions, selectedAccessory, setSelectedAccessory, activeTab, "accessories")}</CardContent>
                   </Card>
                 </TabsContent>
               </ScrollArea>
             </Tabs>
-            <Button 
-              onClick={handleCreateCharacterImage} 
-              disabled={isLoadingMainCharacterImage || isLoadingBackstory || !selectedClothing || !selectedHairstyle} 
-              className="w-full font-semibold mt-6" 
-              size="lg"
-            >
-              {isLoadingMainCharacterImage ? <LoadingSpinner size="sm" /> : 'Skapa Varelse & Spara Lokalt'}
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-4 mt-6">
+              <Button 
+                onClick={handleCreateCharacterImage} 
+                disabled={isLoadingMainCharacterImage || isLoadingBackstory || !selectedClothing || !selectedHairstyle} 
+                className="w-full font-semibold" 
+                size="lg"
+              >
+                {isLoadingMainCharacterImage ? <LoadingSpinner size="sm" /> : 'Skapa Rymdvarelse'}
+              </Button>
+              <Button asChild variant="outline" size="lg" className="w-full font-semibold">
+                <Link href="/">
+                  <ArrowLeft className="mr-2 h-5 w-5" />
+                  Tillbaka
+                </Link>
+              </Button>
+            </div>
           </div>
         </div>
       </main>
     </div>
   );
 }
+
