@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { Shirt, Sparkles, Puzzle, Wand2 } from 'lucide-react';
+import { Shirt, Sparkles, Puzzle, Wand2, RocketIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -19,25 +19,22 @@ import { LoadingSpinner } from '@/components/game/LoadingSpinner';
 interface CustomizationOption {
   id: string;
   name: string;
-  imageUrl: string;
-  imageHint: string;
-  isLoadingImage?: boolean;
 }
 
 const initialClothingOptions: CustomizationOption[] = [
-  { id: 'suit1', name: 'Rymddräkt Alfa', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'alien space suit' },
-  { id: 'suit2', name: 'Glittrig Overall', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'sparkly alien overall' },
-  { id: 'vest1', name: 'Skyddsväst Beta', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'protective alien vest' },
+  { id: 'suit1', name: 'Rymddräkt Alfa' },
+  { id: 'suit2', name: 'Glittrig Overall' },
+  { id: 'vest1', name: 'Skyddsväst Beta' },
 ];
 const initialHairstyleOptions: CustomizationOption[] = [
-  { id: 'hair1', name: 'Antenner', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'alien character antennae' },
-  { id: 'hair2', name: 'Blått Spikigt Hår', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'alien blue spiky hair' },
-  { id: 'hair3', name: 'Lysande Tentakler', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'glowing alien tentacles' },
+  { id: 'hair1', name: 'Antenner' },
+  { id: 'hair2', name: 'Blått Spikigt Hår' },
+  { id: 'hair3', name: 'Lysande Tentakler' },
 ];
 const initialAccessoryOptions: CustomizationOption[] = [
-  { id: 'acc1', name: 'Jetpack X', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'alien jetpack toy' },
-  { id: 'acc2', name: 'Rymdhjälm Pro', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'alien space helmet' },
-  { id: 'acc3', name: 'Stjärn-glasögon', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'alien star sunglasses' },
+  { id: 'acc1', name: 'Jetpack X' },
+  { id: 'acc2', name: 'Rymdhjälm Pro' },
+  { id: 'acc3', name: 'Stjärn-glasögon' },
 ];
 
 const characterStyles = [
@@ -47,6 +44,9 @@ const characterStyles = [
   { value: 'Mystisk', label: 'Mystisk'},
   { value: 'Äventyrlig', label: 'Äventyrlig'},
 ];
+
+const daughterNames = ["Saquina", "Zoe", "Indy"];
+const spacePrefixes = ["Rymd-", "Stjärn-", "Galax-", "Kosmo-", "Nebula-"];
 
 export default function AnpassaVarelsePage() {
   const [selectedClothing, setSelectedClothing] = useState<string | null>(initialClothingOptions[0].id);
@@ -58,77 +58,13 @@ export default function AnpassaVarelsePage() {
   const [isLoadingBackstory, setIsLoadingBackstory] = useState(false);
   const { toast } = useToast();
 
-  const [clothingOptions, setClothingOptions] = useState<CustomizationOption[]>(initialClothingOptions.map(opt => ({...opt, isLoadingImage: opt.imageUrl.startsWith('https://placehold.co')})));
-  const [hairstyleOptions, setHairstyleOptions] = useState<CustomizationOption[]>(initialHairstyleOptions.map(opt => ({...opt, isLoadingImage: opt.imageUrl.startsWith('https://placehold.co')})));
-  const [accessoryOptions, setAccessoryOptions] = useState<CustomizationOption[]>(initialAccessoryOptions.map(opt => ({...opt, isLoadingImage: opt.imageUrl.startsWith('https://placehold.co')})));
+  const [characterImageUrl, setCharacterImageUrl] = useState<string | null>(null);
+  const [isLoadingMainCharacterImage, setIsLoadingMainCharacterImage] = useState(false);
+  const [characterName, setCharacterName] = useState<string | null>(null);
   
-  const [characterImageUrl, setCharacterImageUrl] = useState('https://placehold.co/300x400.png');
-  const [isLoadingMainCharacterImage, setIsLoadingMainCharacterImage] = useState(characterImageUrl.startsWith('https://placehold.co'));
-  const [activeTab, setActiveTab] = useState<string>("clothes");
-
-  // Effect for main character image
-  useEffect(() => {
-    const generateMainImage = async () => {
-      try {
-        const result = await generateImage({ prompt: "cute alien character simple" }); 
-        setCharacterImageUrl(result.imageDataUri);
-      } catch (error) {
-        console.error("Failed to generate main character image:", error);
-      } finally {
-        setIsLoadingMainCharacterImage(false);
-      }
-    };
-
-    if (characterImageUrl.startsWith('https://placehold.co') && isLoadingMainCharacterImage) {
-      generateMainImage();
-    } else if (!characterImageUrl.startsWith('https://placehold.co') && isLoadingMainCharacterImage) {
-      setIsLoadingMainCharacterImage(false);
-    }
-  }, [characterImageUrl, isLoadingMainCharacterImage]);
-
-  // Effect for option images based on active tab
-  useEffect(() => {
-    const fetchOptionImageAndUpdateState = async (
-      option: CustomizationOption,
-      setter: React.Dispatch<React.SetStateAction<CustomizationOption[]>>
-    ) => {
-      if (option.imageUrl.startsWith('https://placehold.co') && !option.isLoadingImage) {
-        setter(prev => prev.map(o => o.id === option.id ? { ...o, isLoadingImage: true } : o));
-        try {
-          const result = await generateImage({ prompt: option.imageHint });
-          setter(prev =>
-            prev.map(o =>
-              o.id === option.id
-                ? { ...o, imageUrl: result.imageDataUri, isLoadingImage: false }
-                : o
-            )
-          );
-        } catch (error) {
-          console.error(`Failed to generate image for ${option.name}:`, error);
-          setter(prev => prev.map(o => o.id === option.id ? { ...o, isLoadingImage: false } : o));
-        }
-      }
-    };
-
-    let optionsToLoad: CustomizationOption[] = [];
-    let setterFunction: React.Dispatch<React.SetStateAction<CustomizationOption[]>> | null = null;
-
-    if (activeTab === 'clothes') {
-      optionsToLoad = clothingOptions;
-      setterFunction = setClothingOptions;
-    } else if (activeTab === 'hairstyles') {
-      optionsToLoad = hairstyleOptions;
-      setterFunction = setHairstyleOptions;
-    } else if (activeTab === 'accessories') {
-      optionsToLoad = accessoryOptions;
-      setterFunction = setAccessoryOptions;
-    }
-
-    if (setterFunction) {
-      optionsToLoad.forEach(opt => fetchOptionImageAndUpdateState(opt, setterFunction!));
-    }
-  }, [activeTab, clothingOptions, hairstyleOptions, accessoryOptions]);
-
+  const [clothingOptions] = useState<CustomizationOption[]>(initialClothingOptions);
+  const [hairstyleOptions] = useState<CustomizationOption[]>(initialHairstyleOptions);
+  const [accessoryOptions] = useState<CustomizationOption[]>(initialAccessoryOptions);
 
   const handleGenerateBackstory = async () => {
     setIsLoadingBackstory(true);
@@ -154,15 +90,53 @@ export default function AnpassaVarelsePage() {
     }
   };
 
+  const handleCreateCharacterImage = async () => {
+    setIsLoadingMainCharacterImage(true);
+    setCharacterImageUrl(null);
+
+    const randomPrefix = spacePrefixes[Math.floor(Math.random() * spacePrefixes.length)];
+    const randomDaughterName = daughterNames[Math.floor(Math.random() * daughterNames.length)];
+    const currentCharacterName = `${randomPrefix}${randomDaughterName}`;
+    setCharacterName(currentCharacterName);
+
+    const clothingName = clothingOptions.find(opt => opt.id === selectedClothing)?.name || "standardklädsel";
+    const hairstyleName = hairstyleOptions.find(opt => opt.id === selectedHairstyle)?.name || "standardfrisyr";
+    const accessoryName = accessoryOptions.find(opt => opt.id === selectedAccessory)?.name || "inga tillbehör";
+
+    let prompt = `Skapa en bild av en rymdvarelse vid namn ${currentCharacterName}. Varelsen är ${selectedCharacterStyle.toLowerCase()}. `;
+    prompt += `Klädsel: ${clothingName}. `;
+    prompt += `Frisyr: ${hairstyleName}. `;
+    prompt += `Tillbehör: ${accessoryName}. `;
+    if (backstory) {
+      prompt += `Bakgrundshistoria: ${backstory}. `;
+    }
+    prompt += `Stil: Enkel, söt tecknad stil, glad och barnvänlig.`;
+
+    try {
+      const result = await generateImage({ prompt }); 
+      setCharacterImageUrl(result.imageDataUri);
+       toast({
+        title: "Varelse Skapad!",
+        description: `Här är ${currentCharacterName}!`,
+      });
+    } catch (error) {
+      console.error("Failed to generate main character image:", error);
+      toast({
+        title: "Fel vid bildgenerering",
+        description: "Kunde inte skapa bild för varelsen.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingMainCharacterImage(false);
+    }
+  };
+
   const renderOptionGrid = (options: CustomizationOption[], selected: string | null, setSelected: (id: string) => void) => (
     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-1">
       {options.map(opt => (
         <OptionCard
           key={opt.id}
           name={opt.name}
-          imageUrl={opt.imageUrl}
-          imageHint={opt.imageHint}
-          isLoadingImage={opt.isLoadingImage}
           isSelected={selected === opt.id}
           onSelect={() => setSelected(opt.id)}
         />
@@ -178,13 +152,20 @@ export default function AnpassaVarelsePage() {
           <div className="lg:col-span-1 flex flex-col items-center">
             <Card className="w-full max-w-sm shadow-xl bg-card/80 backdrop-blur-sm">
               <CardHeader>
-                <CardTitle className="text-center text-2xl font-headline text-primary">Din Varelse</CardTitle>
+                <CardTitle className="text-center text-2xl font-headline text-primary">
+                  {characterName ? characterName : 'Din Varelse'}
+                </CardTitle>
               </CardHeader>
-              <CardContent className="flex justify-center items-center p-6 min-h-[400px]">
+              <CardContent className="flex flex-col justify-center items-center p-6 min-h-[400px]">
                 {isLoadingMainCharacterImage ? (
                    <LoadingSpinner size="lg"/>
+                ) : characterImageUrl ? (
+                  <Image src={characterImageUrl} alt={characterName || "Rymdvarelse"} width={300} height={400} className="rounded-lg object-cover shadow-lg border-2 border-primary" />
                 ) : (
-                  <Image src={characterImageUrl} alt="Rymdvarelse" width={300} height={400} className="rounded-lg object-cover shadow-lg border-2 border-primary" data-ai-hint="cute alien character simple" />
+                  <div className="text-center text-muted-foreground p-4">
+                    <RocketIcon className="h-16 w-16 mx-auto mb-4 text-primary/50" />
+                    <p>Klicka på "Skapa Varelse" nedan när du har gjort dina val och skapat en historia!</p>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -220,13 +201,13 @@ export default function AnpassaVarelsePage() {
               </CardContent>
             </Card>
 
-            <Tabs defaultValue="clothes" className="w-full" onValueChange={setActiveTab}>
+            <Tabs defaultValue="clothes" className="w-full">
               <TabsList className="grid w-full grid-cols-3 bg-primary/20">
                 <TabsTrigger value="clothes" className="text-xs sm:text-sm data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"><Shirt className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5" />Kläder</TabsTrigger>
                 <TabsTrigger value="hairstyles" className="text-xs sm:text-sm data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"><Sparkles className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5" />Frisyrer</TabsTrigger>
                 <TabsTrigger value="accessories" className="text-xs sm:text-sm data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"><Puzzle className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5" />Tillbehör</TabsTrigger>
               </TabsList>
-              <ScrollArea className="h-[calc(100vh-12rem)] sm:h-[calc(100vh-10rem)] lg:h-auto lg:max-h-[70vh] mt-2 p-0.5">
+              <ScrollArea className="h-auto max-h-[calc(100vh-25rem)] lg:max-h-[50vh] mt-2 p-0.5">
                 <TabsContent value="clothes">
                   <Card className="bg-card/70 backdrop-blur-sm border-0 shadow-none">
                     <CardHeader><CardTitle className="text-lg text-primary">Välj Kläder</CardTitle></CardHeader>
@@ -247,11 +228,17 @@ export default function AnpassaVarelsePage() {
                 </TabsContent>
               </ScrollArea>
             </Tabs>
+            <Button 
+              onClick={handleCreateCharacterImage} 
+              disabled={isLoadingMainCharacterImage || isLoadingBackstory} 
+              className="w-full font-semibold mt-6" 
+              size="lg"
+            >
+              {isLoadingMainCharacterImage ? <LoadingSpinner size="sm" /> : 'Skapa Varelse'}
+            </Button>
           </div>
         </div>
       </main>
     </div>
   );
 }
-
-    

@@ -1,39 +1,38 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Image from 'next/image';
-import { Orbit, Flame, Palette } from 'lucide-react';
+import { Orbit, Flame, Palette, RocketIcon } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { GameHeader } from '@/components/layout/GameHeader';
 import { OptionCard } from '@/components/game/OptionCard';
-import { generateImage, type GenerateImageInput } from '@/ai/flows/generate-image-flow';
+import { generateImage } from '@/ai/flows/generate-image-flow';
 import { LoadingSpinner } from '@/components/game/LoadingSpinner';
+import { Button } from '@/components/ui/button';
+import { useToast } from "@/hooks/use-toast";
 
 interface SpaceshipPartOption {
   id: string;
   name: string;
-  imageUrl: string;
-  imageHint: string;
-  isLoadingImage?: boolean;
 }
 
 const initialWingOptions: SpaceshipPartOption[] = [
-  { id: 'wing1', name: 'Snabba Vingar', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'fast wings spaceship' },
-  { id: 'wing2', name: 'Solpanels-Vingar', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'solar panel wings spaceship' },
-  { id: 'wing3', name: 'Mini-vingar', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'mini wings spaceship' },
+  { id: 'wing1', name: 'Snabba Vingar' },
+  { id: 'wing2', name: 'Solpanels-Vingar' },
+  { id: 'wing3', name: 'Mini-vingar' },
 ];
 const initialEngineOptions: SpaceshipPartOption[] = [
-  { id: 'engine1', name: 'Plasma Motor', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'plasma engine spaceship' },
-  { id: 'engine2', name: 'Hyperdrive X', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'hyperdrive engine spaceship' },
-  { id: 'engine3', name: 'Tyst Motor', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'silent engine spaceship' },
+  { id: 'engine1', name: 'Plasma Motor' },
+  { id: 'engine2', name: 'Hyperdrive X' },
+  { id: 'engine3', name: 'Tyst Motor' },
 ];
 const initialDecorationOptions: SpaceshipPartOption[] = [
-  { id: 'deco1', name: 'Stjärn-klistermärken', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'star stickers spaceship decal' },
-  { id: 'deco2', name: 'Rymd-flammor', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'space flames spaceship decal' },
-  { id: 'deco3', name: 'Kosmiska Blommor', imageUrl: 'https://placehold.co/100x100.png', imageHint: 'cosmic flowers spaceship decal' },
+  { id: 'deco1', name: 'Stjärn-klistermärken' },
+  { id: 'deco2', name: 'Rymd-flammor' },
+  { id: 'deco3', name: 'Kosmiska Blommor' },
 ];
 
 export default function AnpassaSkeppPage() {
@@ -41,77 +40,46 @@ export default function AnpassaSkeppPage() {
   const [selectedEngine, setSelectedEngine] = useState<string | null>(initialEngineOptions[0].id);
   const [selectedDecoration, setSelectedDecoration] = useState<string | null>(null);
 
-  const [wingOptions, setWingOptions] = useState<SpaceshipPartOption[]>(initialWingOptions.map(opt => ({...opt, isLoadingImage: opt.imageUrl.startsWith('https://placehold.co')})));
-  const [engineOptions, setEngineOptions] = useState<SpaceshipPartOption[]>(initialEngineOptions.map(opt => ({...opt, isLoadingImage: opt.imageUrl.startsWith('https://placehold.co')})));
-  const [decorationOptions, setDecorationOptions] = useState<SpaceshipPartOption[]>(initialDecorationOptions.map(opt => ({...opt, isLoadingImage: opt.imageUrl.startsWith('https://placehold.co')})));
+  const [wingOptions] = useState<SpaceshipPartOption[]>(initialWingOptions);
+  const [engineOptions] = useState<SpaceshipPartOption[]>(initialEngineOptions);
+  const [decorationOptions] = useState<SpaceshipPartOption[]>(initialDecorationOptions);
 
-  const [spaceshipImageUrl, setSpaceshipImageUrl] = useState('https://placehold.co/400x300.png');
-  const [isLoadingMainSpaceshipImage, setIsLoadingMainSpaceshipImage] = useState(spaceshipImageUrl.startsWith('https://placehold.co'));
-  const [activeTab, setActiveTab] = useState<string>("wings");
+  const [spaceshipImageUrl, setSpaceshipImageUrl] = useState<string | null>(null);
+  const [isLoadingMainSpaceshipImage, setIsLoadingMainSpaceshipImage] = useState(false);
+  const { toast } = useToast();
 
-  // Effect for main spaceship image
-  useEffect(() => {
-    const generateMainImage = async () => {
-      try {
-        const result = await generateImage({ prompt: "spaceship cartoon simple" });
-        setSpaceshipImageUrl(result.imageDataUri);
-      } catch (error) {
-        console.error("Failed to generate main spaceship image:", error);
-      } finally {
-        setIsLoadingMainSpaceshipImage(false);
-      }
-    };
+  const handleCreateSpaceshipImage = async () => {
+    setIsLoadingMainSpaceshipImage(true);
+    setSpaceshipImageUrl(null);
 
-    if (spaceshipImageUrl.startsWith('https://placehold.co') && isLoadingMainSpaceshipImage) {
-      generateMainImage();
-    } else if (!spaceshipImageUrl.startsWith('https://placehold.co') && isLoadingMainSpaceshipImage) {
+    const wingName = wingOptions.find(opt => opt.id === selectedWings)?.name || "standardvingar";
+    const engineName = engineOptions.find(opt => opt.id === selectedEngine)?.name || "standardmotor";
+    const decorationName = decorationOptions.find(opt => opt.id === selectedDecoration)?.name || "inga dekorationer";
+    
+    const prompt = `Skapa en bild av ett rymdskepp. 
+    Vingar: ${wingName}. 
+    Motor: ${engineName}. 
+    Dekoration: ${decorationName}. 
+    Stil: Enkel, cool tecknad stil, barnvänlig.`;
+
+    try {
+      const result = await generateImage({ prompt });
+      setSpaceshipImageUrl(result.imageDataUri);
+      toast({
+        title: "Skepp Skapat!",
+        description: "Ditt unika rymdskepp är redo för äventyr!",
+      });
+    } catch (error) {
+      console.error("Failed to generate main spaceship image:", error);
+      toast({
+        title: "Fel vid bildgenerering",
+        description: "Kunde inte skapa bild för skeppet.",
+        variant: "destructive",
+      });
+    } finally {
       setIsLoadingMainSpaceshipImage(false);
     }
-  }, [spaceshipImageUrl, isLoadingMainSpaceshipImage]);
-
-  // Effect for option images based on active tab
-  useEffect(() => {
-    const fetchImagesForOptionList = async (
-        list: SpaceshipPartOption[],
-        setter: React.Dispatch<React.SetStateAction<SpaceshipPartOption[]>>
-    ) => {
-        list.forEach(async (opt) => {
-            if (opt.imageUrl.startsWith('https://placehold.co') && !opt.isLoadingImage) {
-                setter(prev =>
-                    prev.map(o =>
-                        o.id === opt.id ? { ...o, isLoadingImage: true } : o
-                    )
-                );
-                try {
-                    const result = await generateImage({ prompt: opt.imageHint });
-                    setter(prev =>
-                        prev.map(o =>
-                            o.id === opt.id
-                                ? { ...o, imageUrl: result.imageDataUri, isLoadingImage: false }
-                                : o
-                        )
-                    );
-                } catch (error) {
-                    console.error(`Failed to generate image for ${opt.name}:`, error);
-                    setter(prev =>
-                        prev.map(o =>
-                            o.id === opt.id ? { ...o, isLoadingImage: false } : o // Stop loading, keep placeholder
-                        )
-                    );
-                }
-            }
-        });
-    };
-
-    if (activeTab === 'wings') {
-      fetchImagesForOptionList(wingOptions, setWingOptions);
-    } else if (activeTab === 'engines') {
-      fetchImagesForOptionList(engineOptions, setEngineOptions);
-    } else if (activeTab === 'decorations') {
-      fetchImagesForOptionList(decorationOptions, setDecorationOptions);
-    }
-  }, [activeTab, wingOptions, engineOptions, decorationOptions]);
-
+  };
 
   const renderOptionGrid = (options: SpaceshipPartOption[], selected: string | null, setSelected: (id: string) => void) => (
     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-1">
@@ -119,9 +87,6 @@ export default function AnpassaSkeppPage() {
         <OptionCard
           key={opt.id}
           name={opt.name}
-          imageUrl={opt.imageUrl}
-          imageHint={opt.imageHint}
-          isLoadingImage={opt.isLoadingImage}
           isSelected={selected === opt.id}
           onSelect={() => setSelected(opt.id)}
         />
@@ -139,24 +104,29 @@ export default function AnpassaSkeppPage() {
               <CardHeader>
                 <CardTitle className="text-center text-2xl font-headline text-primary">Ditt Skepp</CardTitle>
               </CardHeader>
-              <CardContent className="flex justify-center items-center p-6 min-h-[300px]">
+              <CardContent className="flex flex-col justify-center items-center p-6 min-h-[300px]">
                 {isLoadingMainSpaceshipImage ? (
                   <LoadingSpinner size="lg"/>
+                ) : spaceshipImageUrl ? (
+                  <Image src={spaceshipImageUrl} alt="Rymdskepp" width={400} height={300} className="rounded-lg object-contain shadow-lg border-2 border-primary" />
                 ) : (
-                  <Image src={spaceshipImageUrl} alt="Rymdskepp" width={400} height={300} className="rounded-lg object-contain shadow-lg border-2 border-primary" data-ai-hint="spaceship cartoon simple" />
+                  <div className="text-center text-muted-foreground p-4">
+                    <RocketIcon className="h-16 w-16 mx-auto mb-4 text-primary/50" />
+                    <p>Gör dina val nedan och klicka sedan på "Skapa Skepp"!</p>
+                  </div>
                 )}
               </CardContent>
             </Card>
           </div>
 
           <div className="lg:col-span-2">
-            <Tabs defaultValue="wings" className="w-full" onValueChange={setActiveTab}>
+            <Tabs defaultValue="wings" className="w-full">
               <TabsList className="grid w-full grid-cols-3 bg-primary/20">
                 <TabsTrigger value="wings" className="text-xs sm:text-sm data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"><Orbit className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5" />Vingar</TabsTrigger>
                 <TabsTrigger value="engines" className="text-xs sm:text-sm data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"><Flame className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5" />Motorer</TabsTrigger>
                 <TabsTrigger value="decorations" className="text-xs sm:text-sm data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"><Palette className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5" />Dekor</TabsTrigger>
               </TabsList>
-              <ScrollArea className="h-[calc(100vh-12rem)] sm:h-[calc(100vh-10rem)] lg:h-auto lg:max-h-[70vh] mt-2 p-0.5">
+              <ScrollArea className="h-auto max-h-[calc(100vh-20rem)] lg:max-h-[60vh] mt-2 p-0.5">
                 <TabsContent value="wings">
                   <Card className="bg-card/70 backdrop-blur-sm border-0 shadow-none">
                     <CardHeader><CardTitle className="text-lg text-primary">Välj Vingar</CardTitle></CardHeader>
@@ -177,11 +147,17 @@ export default function AnpassaSkeppPage() {
                 </TabsContent>
               </ScrollArea>
             </Tabs>
+            <Button 
+              onClick={handleCreateSpaceshipImage} 
+              disabled={isLoadingMainSpaceshipImage} 
+              className="w-full font-semibold mt-6" 
+              size="lg"
+            >
+              {isLoadingMainSpaceshipImage ? <LoadingSpinner size="sm" /> : 'Skapa Skepp'}
+            </Button>
           </div>
         </div>
       </main>
     </div>
   );
 }
-
-    
