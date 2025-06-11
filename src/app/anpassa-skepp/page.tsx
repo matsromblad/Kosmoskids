@@ -3,16 +3,19 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { Orbit, Flame, Palette, RocketIcon } from 'lucide-react';
+import Link from 'next/link';
+import { Orbit, Flame, Palette, RocketIcon, Wand2, ArrowLeft } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { GameHeader } from '@/components/layout/GameHeader';
 import { OptionCard } from '@/components/game/OptionCard';
 import { generateImage } from '@/ai/flows/generate-image-flow';
+import { generateSpaceshipBackstory, type GenerateSpaceshipBackstoryInput } from '@/ai/flows/generate-spaceship-backstory';
 import { LoadingSpinner } from '@/components/game/LoadingSpinner';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface SpaceshipPartOption {
   id: string;
@@ -21,6 +24,8 @@ interface SpaceshipPartOption {
 
 interface StoredSpaceship {
   imageUrl: string;
+  backstory: string | null;
+  style: string | null;
   parts: {
     wing: string | null;
     engine: string | null;
@@ -51,6 +56,14 @@ const initialDecorationOptions: SpaceshipPartOption[] = [
   { id: 'deco3', name: 'Kosmiska Blommor' },
 ];
 
+const spaceshipStyles = [
+  { value: 'Snabb kurir', label: 'Snabb kurir'},
+  { value: 'Tungt lastfartyg', label: 'Tungt lastfartyg'},
+  { value: 'Utforskarskepp', label: 'Utforskarskepp'},
+  { value: 'Lyxkryssare', label: 'Lyxkryssare'},
+  { value: 'Stridsfarkost', label: 'Stridsfarkost'},
+];
+
 export default function AnpassaSkeppPage() {
   const [selectedWings, setSelectedWings] = useState<string | null>(null);
   const [selectedEngine, setSelectedEngine] = useState<string | null>(null);
@@ -62,6 +75,10 @@ export default function AnpassaSkeppPage() {
 
   const [spaceshipImageUrl, setSpaceshipImageUrl] = useState<string | null>(null);
   const [isLoadingMainSpaceshipImage, setIsLoadingMainSpaceshipImage] = useState(false);
+  const [selectedSpaceshipStyle, setSelectedSpaceshipStyle] = useState<string>(spaceshipStyles[0].value);
+  const [spaceshipBackstory, setSpaceshipBackstory] = useState<string | null>(null);
+  const [isLoadingSpaceshipBackstory, setIsLoadingSpaceshipBackstory] = useState(false);
+
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<string>("wings");
 
@@ -74,17 +91,61 @@ export default function AnpassaSkeppPage() {
         setSelectedWings(storedSpaceship.parts.wing);
         setSelectedEngine(storedSpaceship.parts.engine);
         setSelectedDecoration(storedSpaceship.parts.decoration);
+        setSpaceshipBackstory(storedSpaceship.backstory);
+        if (storedSpaceship.style) {
+          setSelectedSpaceshipStyle(storedSpaceship.style);
+        }
       } catch (e) {
         console.error("Failed to parse stored spaceship", e);
         localStorage.removeItem(SPACESHIP_STORAGE_KEY);
       }
     } else {
-      // Set defaults if nothing is stored
       setSelectedWings(initialWingOptions[0].id);
       setSelectedEngine(initialEngineOptions[0].id);
     }
   }, []);
 
+  const handleGenerateSpaceshipBackstory = async () => {
+    if (!selectedWings || !selectedEngine) {
+      toast({
+        title: "Val Saknas",
+        description: "Välj åtminstone vingar och motor innan du skapar en historia.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsLoadingSpaceshipBackstory(true);
+    setSpaceshipBackstory(null);
+
+    const wingName = wingOptions.find(opt => opt.id === selectedWings)?.name || "standardvingar";
+    const engineName = engineOptions.find(opt => opt.id === selectedEngine)?.name || "standardmotor";
+    const decorationName = decorationOptions.find(opt => opt.id === selectedDecoration)?.name;
+
+    try {
+      const input: GenerateSpaceshipBackstoryInput = {
+        spaceshipStyle: selectedSpaceshipStyle,
+        wingName,
+        engineName,
+        decorationName: decorationName,
+      };
+      const result = await generateSpaceshipBackstory(input);
+      setSpaceshipBackstory(result.backstory);
+      toast({
+        title: "Skeppshistoria Skapad!",
+        description: "En unik historia för ditt skepp är klar.",
+      });
+    } catch (error) {
+      console.error("Error generating spaceship backstory:", error);
+      setSpaceshipBackstory("Ett fel uppstod när skeppets historia skulle skapas. Försök igen senare!");
+      toast({
+        title: "Fel",
+        description: "Kunde inte generera skeppshistoria.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingSpaceshipBackstory(false);
+    }
+  };
 
   const handleCreateSpaceshipImage = async () => {
     if (!selectedWings || !selectedEngine) {
@@ -103,29 +164,34 @@ export default function AnpassaSkeppPage() {
     const engineName = engineOptions.find(opt => opt.id === selectedEngine)?.name || "standardmotor";
     const decorationName = decorationOptions.find(opt => opt.id === selectedDecoration)?.name || "inga dekorationer";
     
-    const prompt = `Skapa en bild av ett rymdskepp. 
+    let prompt = `Skapa en bild av ett rymdskepp. 
     Vingar: ${wingName}. 
     Motor: ${engineName}. 
     Dekoration: ${decorationName}. 
-    Stil: Enkel, cool tecknad stil, barnvänlig, rymdtema.`;
+    Skeppets stil: ${selectedSpaceshipStyle}. `;
+    if (spaceshipBackstory) {
+      prompt += `Bakgrundshistoria: ${spaceshipBackstory}. `;
+    }
+    prompt += `Visuell stil: Enkel, cool tecknad stil, barnvänlig, rymdtema.`;
 
     try {
       const result = await generateImage({ prompt });
       setSpaceshipImageUrl(result.imageDataUri);
       toast({
         title: "Skepp Skapat!",
-        description: "Ditt unika rymdskepp är redo! Glöm inte att spara.",
+        description: "Ditt unika rymdskepp är redo! Det är sparat lokalt.",
       });
 
-      // Save to localStorage
       const spaceshipToStore: StoredSpaceship = {
         imageUrl: result.imageDataUri,
+        backstory: spaceshipBackstory,
+        style: selectedSpaceshipStyle,
         parts: {
           wing: selectedWings,
           engine: selectedEngine,
           decoration: selectedDecoration,
         },
-        partNames: { wingName, engineName, decorationName}
+        partNames: { wingName, engineName, decorationName }
       };
       localStorage.setItem(SPACESHIP_STORAGE_KEY, JSON.stringify(spaceshipToStore));
 
@@ -172,7 +238,7 @@ export default function AnpassaSkeppPage() {
                 ) : (
                   <div className="text-center text-muted-foreground p-4">
                     <RocketIcon className="h-16 w-16 mx-auto mb-4 text-primary/50" />
-                    <p>Gör dina val nedan och klicka sedan på "Skapa Skepp & Spara Lokalt"!</p>
+                    <p>Gör dina val, skapa en historia och klicka sedan på "Skapa Skepp"!</p>
                   </div>
                 )}
               </CardContent>
@@ -180,13 +246,47 @@ export default function AnpassaSkeppPage() {
           </div>
 
           <div className="lg:col-span-2">
+            <Card className="w-full shadow-xl bg-card/80 backdrop-blur-sm mb-6">
+              <CardHeader>
+                <CardTitle className="text-xl font-headline text-accent flex items-center gap-2"><Wand2 /> Skeppets Historia</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <label htmlFor="spaceshipStyle" className="block text-sm font-medium text-muted-foreground mb-1">Välj stil för skeppets historia:</label>
+                  <Select value={selectedSpaceshipStyle} onValueChange={setSelectedSpaceshipStyle}>
+                    <SelectTrigger id="spaceshipStyle" className="w-full bg-input/50 border-border text-foreground">
+                      <SelectValue placeholder="Välj en stil" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {spaceshipStyles.map(style => (
+                        <SelectItem key={style.value} value={style.value}>{style.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button 
+                  onClick={handleGenerateSpaceshipBackstory} 
+                  disabled={isLoadingSpaceshipBackstory || !selectedWings || !selectedEngine} 
+                  className="w-full font-semibold" 
+                  variant="secondary"
+                >
+                  {isLoadingSpaceshipBackstory ? <LoadingSpinner size="sm" /> : 'Skapa Historia för Skeppet'}
+                </Button>
+                {spaceshipBackstory && (
+                  <ScrollArea className="h-24 mt-2 p-3 border rounded-md bg-muted/50 text-sm text-foreground">
+                    <p>{spaceshipBackstory}</p>
+                  </ScrollArea>
+                )}
+              </CardContent>
+            </Card>
+
             <Tabs defaultValue="wings" className="w-full" onValueChange={setActiveTab}>
               <TabsList className="grid w-full grid-cols-3 bg-primary/20">
                 <TabsTrigger value="wings" className="text-xs sm:text-sm data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"><Orbit className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5" />Vingar</TabsTrigger>
                 <TabsTrigger value="engines" className="text-xs sm:text-sm data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"><Flame className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5" />Motorer</TabsTrigger>
                 <TabsTrigger value="decorations" className="text-xs sm:text-sm data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"><Palette className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5" />Dekor</TabsTrigger>
               </TabsList>
-              <ScrollArea className="h-auto max-h-[calc(100vh-20rem)] lg:max-h-[60vh] mt-2 p-0.5">
+              <ScrollArea className="h-auto max-h-[calc(100vh-20rem)] lg:max-h-[40vh] mt-2 p-0.5">
                 <TabsContent value="wings" forceMount={activeTab === "wings"}>
                   <Card className="bg-card/70 backdrop-blur-sm border-0 shadow-none">
                     <CardHeader><CardTitle className="text-lg text-primary">Välj Vingar</CardTitle></CardHeader>
@@ -207,14 +307,22 @@ export default function AnpassaSkeppPage() {
                 </TabsContent>
               </ScrollArea>
             </Tabs>
-            <Button 
-              onClick={handleCreateSpaceshipImage} 
-              disabled={isLoadingMainSpaceshipImage || !selectedWings || !selectedEngine} 
-              className="w-full font-semibold mt-6" 
-              size="lg"
-            >
-              {isLoadingMainSpaceshipImage ? <LoadingSpinner size="sm" /> : 'Skapa Skepp & Spara Lokalt'}
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-4 mt-6">
+              <Button 
+                onClick={handleCreateSpaceshipImage} 
+                disabled={isLoadingMainSpaceshipImage || isLoadingSpaceshipBackstory || !selectedWings || !selectedEngine} 
+                className="w-full font-semibold" 
+                size="lg"
+              >
+                {isLoadingMainSpaceshipImage ? <LoadingSpinner size="sm" /> : 'Skapa Skepp'}
+              </Button>
+              <Button asChild variant="outline" size="lg" className="w-full font-semibold">
+                <Link href="/">
+                  <ArrowLeft className="mr-2 h-5 w-5" />
+                  Tillbaka
+                </Link>
+              </Button>
+            </div>
           </div>
         </div>
       </main>

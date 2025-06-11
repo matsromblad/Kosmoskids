@@ -15,6 +15,8 @@ interface StoredCharacter {
 
 interface StoredSpaceship {
   imageUrl: string;
+  backstory: string | null; // Added
+  style: string | null; // Added
   parts: {
     wing: string | null;
     engine: string | null;
@@ -35,25 +37,23 @@ export default function Home() {
   const [spaceshipData, setSpaceshipData] = useState<StoredSpaceship | null>(null);
 
   useEffect(() => {
-    // Load character data
     const storedCharacterRaw = localStorage.getItem(CHARACTER_STORAGE_KEY);
     if (storedCharacterRaw) {
       try {
         setCharacterData(JSON.parse(storedCharacterRaw));
       } catch (e) {
         console.error("Failed to parse stored character data", e);
-        localStorage.removeItem(CHARACTER_STORAGE_KEY); // Clear corrupted data
+        localStorage.removeItem(CHARACTER_STORAGE_KEY); 
       }
     }
 
-    // Load spaceship data
     const storedSpaceshipRaw = localStorage.getItem(SPACESHIP_STORAGE_KEY);
     if (storedSpaceshipRaw) {
       try {
         setSpaceshipData(JSON.parse(storedSpaceshipRaw));
       } catch (e) {
         console.error("Failed to parse stored spaceship data", e);
-        localStorage.removeItem(SPACESHIP_STORAGE_KEY); // Clear corrupted data
+        localStorage.removeItem(SPACESHIP_STORAGE_KEY); 
       }
     }
   }, []);
@@ -65,9 +65,9 @@ export default function Home() {
             <Image 
                 src="https://placehold.co/200x200.png" 
                 alt="Kosmoskids Logotyp" 
-                layout="fill" 
-                objectFit="contain" 
-                className="rounded-full"
+                width={200}
+                height={200}
+                className="rounded-full object-contain"
                 data-ai-hint="cute alien planet logo"
             />
         </div>
