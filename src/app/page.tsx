@@ -1,10 +1,76 @@
+
+"use client";
+
+import { useState, useEffect } from 'react';
 import { Users, Rocket, Globe2 } from 'lucide-react';
+import Image from 'next/image';
 import { MainMenuButton } from '@/components/game/MainMenuButton';
 
+interface StoredCharacter {
+  name: string;
+  imageUrl: string;
+  backstory: string;
+  style: string;
+}
+
+interface StoredSpaceship {
+  imageUrl: string;
+  parts: {
+    wing: string | null;
+    engine: string | null;
+    decoration: string | null;
+  };
+   partNames: {
+    wingName: string;
+    engineName: string;
+    decorationName: string;
+  }
+}
+
+const CHARACTER_STORAGE_KEY = "kosmoskids_character";
+const SPACESHIP_STORAGE_KEY = "kosmoskids_spaceship";
+
 export default function Home() {
+  const [characterData, setCharacterData] = useState<StoredCharacter | null>(null);
+  const [spaceshipData, setSpaceshipData] = useState<StoredSpaceship | null>(null);
+
+  useEffect(() => {
+    // Load character data
+    const storedCharacterRaw = localStorage.getItem(CHARACTER_STORAGE_KEY);
+    if (storedCharacterRaw) {
+      try {
+        setCharacterData(JSON.parse(storedCharacterRaw));
+      } catch (e) {
+        console.error("Failed to parse stored character data", e);
+        localStorage.removeItem(CHARACTER_STORAGE_KEY); // Clear corrupted data
+      }
+    }
+
+    // Load spaceship data
+    const storedSpaceshipRaw = localStorage.getItem(SPACESHIP_STORAGE_KEY);
+    if (storedSpaceshipRaw) {
+      try {
+        setSpaceshipData(JSON.parse(storedSpaceshipRaw));
+      } catch (e) {
+        console.error("Failed to parse stored spaceship data", e);
+        localStorage.removeItem(SPACESHIP_STORAGE_KEY); // Clear corrupted data
+      }
+    }
+  }, []);
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4 md:p-8 bg-gradient-to-br from-background to-indigo-900/50">
       <header className="text-center mb-12">
+         <div className="relative w-40 h-40 mx-auto mb-4">
+            <Image 
+                src="https://placehold.co/200x200.png" 
+                alt="Kosmoskids Logotyp" 
+                layout="fill" 
+                objectFit="contain" 
+                className="rounded-full"
+                data-ai-hint="cute alien planet logo"
+            />
+        </div>
         <h1 className="text-5xl md:text-7xl font-headline font-bold text-primary animate-pulse">
           Kosmoskids
         </h1>
@@ -16,17 +82,20 @@ export default function Home() {
       <main className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 w-full max-w-4xl">
         <MainMenuButton
           href="/anpassa-varelse"
-          icon={Users}
+          icon={!characterData?.imageUrl ? Users : undefined}
           title="Min Varelse"
-          description="Skapa och styla din unika rymdvarelse."
+          description={characterData?.name ? `Anpassa ${characterData.name} eller skapa en ny!` : "Skapa och styla din unika rymdvarelse."}
           className="bg-violet-500/30 hover:bg-violet-500/40 border-violet-400"
+          imageUrl={characterData?.imageUrl}
+          characterName={characterData?.name}
         />
         <MainMenuButton
           href="/anpassa-skepp"
-          icon={Rocket}
+          icon={!spaceshipData?.imageUrl ? Rocket : undefined}
           title="Mitt Skepp"
-          description="Bygg och designa ditt drömrymdskepp."
+          description={spaceshipData?.imageUrl ? "Visa och anpassa ditt rymdskepp." : "Bygg och designa ditt drömrymdskepp."}
           className="bg-pink-500/30 hover:bg-pink-500/40 border-pink-400"
+          imageUrl={spaceshipData?.imageUrl}
         />
         <MainMenuButton
           href="/rymdkarta"

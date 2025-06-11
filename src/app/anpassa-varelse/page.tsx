@@ -21,6 +21,18 @@ interface CustomizationOption {
   name: string;
 }
 
+interface StoredCharacter {
+  name: string;
+  imageUrl: string;
+  backstory: string;
+  style: string;
+  clothing: string | null;
+  hairstyle: string | null;
+  accessory: string | null;
+}
+
+const CHARACTER_STORAGE_KEY = "kosmoskids_character";
+
 const initialClothingOptions: CustomizationOption[] = [
   { id: 'suit1', name: 'Rymddräkt Alfa' },
   { id: 'suit2', name: 'Glittrig Overall' },
@@ -49,8 +61,8 @@ const daughterNames = ["Saquina", "Zoe", "Indy"];
 const spacePrefixes = ["Rymd-", "Stjärn-", "Galax-", "Kosmo-", "Nebula-"];
 
 export default function AnpassaVarelsePage() {
-  const [selectedClothing, setSelectedClothing] = useState<string | null>(initialClothingOptions[0].id);
-  const [selectedHairstyle, setSelectedHairstyle] = useState<string | null>(initialHairstyleOptions[0].id);
+  const [selectedClothing, setSelectedClothing] = useState<string | null>(null);
+  const [selectedHairstyle, setSelectedHairstyle] = useState<string | null>(null);
   const [selectedAccessory, setSelectedAccessory] = useState<string | null>(null);
   
   const [selectedCharacterStyle, setSelectedCharacterStyle] = useState<string>(characterStyles[0].value);
@@ -65,17 +77,56 @@ export default function AnpassaVarelsePage() {
   const [clothingOptions] = useState<CustomizationOption[]>(initialClothingOptions);
   const [hairstyleOptions] = useState<CustomizationOption[]>(initialHairstyleOptions);
   const [accessoryOptions] = useState<CustomizationOption[]>(initialAccessoryOptions);
+  const [activeTab, setActiveTab] = useState<string>("clothes");
+
+  useEffect(() => {
+    const storedCharacterRaw = localStorage.getItem(CHARACTER_STORAGE_KEY);
+    if (storedCharacterRaw) {
+      try {
+        const storedCharacter: StoredCharacter = JSON.parse(storedCharacterRaw);
+        setCharacterName(storedCharacter.name);
+        setCharacterImageUrl(storedCharacter.imageUrl);
+        setBackstory(storedCharacter.backstory);
+        setSelectedCharacterStyle(storedCharacter.style);
+        setSelectedClothing(storedCharacter.clothing);
+        setSelectedHairstyle(storedCharacter.hairstyle);
+        setSelectedAccessory(storedCharacter.accessory);
+      } catch (e) {
+        console.error("Failed to parse stored character", e);
+        localStorage.removeItem(CHARACTER_STORAGE_KEY);
+      }
+    } else {
+      // Set defaults if nothing is stored
+      setSelectedClothing(initialClothingOptions[0].id);
+      setSelectedHairstyle(initialHairstyleOptions[0].id);
+    }
+  }, []);
+
+
+  const generateAndSetCharacterName = (): string => {
+    const randomPrefix = spacePrefixes[Math.floor(Math.random() * spacePrefixes.length)];
+    const randomDaughterName = daughterNames[Math.floor(Math.random() * daughterNames.length)];
+    const newName = `${randomPrefix}${randomDaughterName}`;
+    setCharacterName(newName);
+    return newName;
+  };
 
   const handleGenerateBackstory = async () => {
     setIsLoadingBackstory(true);
     setBackstory(null);
+    
+    const currentName = characterName || generateAndSetCharacterName();
+
     try {
-      const input: GenerateCharacterBackstoryInput = { characterStyle: selectedCharacterStyle };
+      const input: GenerateCharacterBackstoryInput = { 
+        characterName: currentName, 
+        characterStyle: selectedCharacterStyle 
+      };
       const result = await generateCharacterBackstory(input);
       setBackstory(result.backstory);
       toast({
         title: "Bakgrundshistoria Skapad!",
-        description: "Din rymdvarelses unika historia är klar.",
+        description: `${currentName}s unika historia är klar.`,
       });
     } catch (error) {
       console.error("Error generating backstory:", error);
@@ -94,31 +145,41 @@ export default function AnpassaVarelsePage() {
     setIsLoadingMainCharacterImage(true);
     setCharacterImageUrl(null);
 
-    const randomPrefix = spacePrefixes[Math.floor(Math.random() * spacePrefixes.length)];
-    const randomDaughterName = daughterNames[Math.floor(Math.random() * daughterNames.length)];
-    const currentCharacterName = `${randomPrefix}${randomDaughterName}`;
-    setCharacterName(currentCharacterName);
+    const currentName = characterName || generateAndSetCharacterName();
 
     const clothingName = clothingOptions.find(opt => opt.id === selectedClothing)?.name || "standardklädsel";
     const hairstyleName = hairstyleOptions.find(opt => opt.id === selectedHairstyle)?.name || "standardfrisyr";
     const accessoryName = accessoryOptions.find(opt => opt.id === selectedAccessory)?.name || "inga tillbehör";
 
-    let prompt = `Skapa en bild av en rymdvarelse vid namn ${currentCharacterName}. Varelsen är ${selectedCharacterStyle.toLowerCase()}. `;
+    let prompt = `Skapa en bild av en rymdvarelse vid namn ${currentName}. Varelsen är ${selectedCharacterStyle.toLowerCase()}. `;
     prompt += `Klädsel: ${clothingName}. `;
     prompt += `Frisyr: ${hairstyleName}. `;
     prompt += `Tillbehör: ${accessoryName}. `;
     if (backstory) {
       prompt += `Bakgrundshistoria: ${backstory}. `;
     }
-    prompt += `Stil: Enkel, söt tecknad stil, glad och barnvänlig.`;
+    prompt += `Stil: Enkel, söt tecknad stil, glad och barnvänlig, rymdtema.`;
 
     try {
       const result = await generateImage({ prompt }); 
       setCharacterImageUrl(result.imageDataUri);
-       toast({
+      toast({
         title: "Varelse Skapad!",
-        description: `Här är ${currentCharacterName}!`,
+        description: `Här är ${currentName}! Glöm inte att spara.`,
       });
+      
+      // Save to localStorage
+      const characterToStore: StoredCharacter = {
+        name: currentName,
+        imageUrl: result.imageDataUri,
+        backstory: backstory || "",
+        style: selectedCharacterStyle,
+        clothing: selectedClothing,
+        hairstyle: selectedHairstyle,
+        accessory: selectedAccessory,
+      };
+      localStorage.setItem(CHARACTER_STORAGE_KEY, JSON.stringify(characterToStore));
+
     } catch (error) {
       console.error("Failed to generate main character image:", error);
       toast({
@@ -143,7 +204,7 @@ export default function AnpassaVarelsePage() {
       ))}
     </div>
   );
-
+  
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-background to-indigo-900/30">
       <GameHeader title="Anpassa din Rymdvarelse" />
@@ -164,7 +225,7 @@ export default function AnpassaVarelsePage() {
                 ) : (
                   <div className="text-center text-muted-foreground p-4">
                     <RocketIcon className="h-16 w-16 mx-auto mb-4 text-primary/50" />
-                    <p>Klicka på "Skapa Varelse" nedan när du har gjort dina val och skapat en historia!</p>
+                    <p>Gör dina val, skapa en historia och klicka sedan på "Skapa Varelse"!</p>
                   </div>
                 )}
               </CardContent>
@@ -174,7 +235,7 @@ export default function AnpassaVarelsePage() {
           <div className="lg:col-span-2">
              <Card className="w-full shadow-xl bg-card/80 backdrop-blur-sm mb-6">
               <CardHeader>
-                <CardTitle className="text-xl font-headline text-accent flex items-center gap-2"><Wand2 /> Bakgrundshistoria</CardTitle>
+                <CardTitle className="text-xl font-headline text-accent flex items-center gap-2"><Wand2 /> Bakgrundshistoria & Namn</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
@@ -191,7 +252,7 @@ export default function AnpassaVarelsePage() {
                   </Select>
                 </div>
                 <Button onClick={handleGenerateBackstory} disabled={isLoadingBackstory} className="w-full font-semibold" variant="secondary">
-                  {isLoadingBackstory ? <LoadingSpinner size="sm" /> : 'Skapa Historia'}
+                  {isLoadingBackstory ? <LoadingSpinner size="sm" /> : (characterName ? 'Skapa Ny Historia' : 'Ge Namn & Skapa Historia')}
                 </Button>
                 {backstory && (
                   <ScrollArea className="h-32 mt-2 p-3 border rounded-md bg-muted/50 text-sm text-foreground">
@@ -201,26 +262,26 @@ export default function AnpassaVarelsePage() {
               </CardContent>
             </Card>
 
-            <Tabs defaultValue="clothes" className="w-full">
+            <Tabs defaultValue="clothes" className="w-full" onValueChange={setActiveTab}>
               <TabsList className="grid w-full grid-cols-3 bg-primary/20">
                 <TabsTrigger value="clothes" className="text-xs sm:text-sm data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"><Shirt className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5" />Kläder</TabsTrigger>
                 <TabsTrigger value="hairstyles" className="text-xs sm:text-sm data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"><Sparkles className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5" />Frisyrer</TabsTrigger>
                 <TabsTrigger value="accessories" className="text-xs sm:text-sm data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"><Puzzle className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5" />Tillbehör</TabsTrigger>
               </TabsList>
               <ScrollArea className="h-auto max-h-[calc(100vh-25rem)] lg:max-h-[50vh] mt-2 p-0.5">
-                <TabsContent value="clothes">
+                <TabsContent value="clothes" forceMount={activeTab === "clothes"}>
                   <Card className="bg-card/70 backdrop-blur-sm border-0 shadow-none">
                     <CardHeader><CardTitle className="text-lg text-primary">Välj Kläder</CardTitle></CardHeader>
                     <CardContent>{renderOptionGrid(clothingOptions, selectedClothing, setSelectedClothing)}</CardContent>
                   </Card>
                 </TabsContent>
-                <TabsContent value="hairstyles">
+                <TabsContent value="hairstyles" forceMount={activeTab === "hairstyles"}>
                    <Card className="bg-card/70 backdrop-blur-sm border-0 shadow-none">
                     <CardHeader><CardTitle className="text-lg text-primary">Välj Frisyr</CardTitle></CardHeader>
                     <CardContent>{renderOptionGrid(hairstyleOptions, selectedHairstyle, setSelectedHairstyle)}</CardContent>
                   </Card>
                 </TabsContent>
-                <TabsContent value="accessories">
+                <TabsContent value="accessories" forceMount={activeTab === "accessories"}>
                    <Card className="bg-card/70 backdrop-blur-sm border-0 shadow-none">
                     <CardHeader><CardTitle className="text-lg text-primary">Välj Tillbehör</CardTitle></CardHeader>
                     <CardContent>{renderOptionGrid(accessoryOptions, selectedAccessory, setSelectedAccessory)}</CardContent>
@@ -230,11 +291,11 @@ export default function AnpassaVarelsePage() {
             </Tabs>
             <Button 
               onClick={handleCreateCharacterImage} 
-              disabled={isLoadingMainCharacterImage || isLoadingBackstory} 
+              disabled={isLoadingMainCharacterImage || isLoadingBackstory || !selectedClothing || !selectedHairstyle} 
               className="w-full font-semibold mt-6" 
               size="lg"
             >
-              {isLoadingMainCharacterImage ? <LoadingSpinner size="sm" /> : 'Skapa Varelse'}
+              {isLoadingMainCharacterImage ? <LoadingSpinner size="sm" /> : 'Skapa Varelse & Spara Lokalt'}
             </Button>
           </div>
         </div>

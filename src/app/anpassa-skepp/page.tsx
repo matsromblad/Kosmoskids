@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { Orbit, Flame, Palette, RocketIcon } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,6 +18,22 @@ interface SpaceshipPartOption {
   id: string;
   name: string;
 }
+
+interface StoredSpaceship {
+  imageUrl: string;
+  parts: {
+    wing: string | null;
+    engine: string | null;
+    decoration: string | null;
+  };
+  partNames: {
+    wingName: string;
+    engineName: string;
+    decorationName: string;
+  }
+}
+
+const SPACESHIP_STORAGE_KEY = "kosmoskids_spaceship";
 
 const initialWingOptions: SpaceshipPartOption[] = [
   { id: 'wing1', name: 'Snabba Vingar' },
@@ -36,8 +52,8 @@ const initialDecorationOptions: SpaceshipPartOption[] = [
 ];
 
 export default function AnpassaSkeppPage() {
-  const [selectedWings, setSelectedWings] = useState<string | null>(initialWingOptions[0].id);
-  const [selectedEngine, setSelectedEngine] = useState<string | null>(initialEngineOptions[0].id);
+  const [selectedWings, setSelectedWings] = useState<string | null>(null);
+  const [selectedEngine, setSelectedEngine] = useState<string | null>(null);
   const [selectedDecoration, setSelectedDecoration] = useState<string | null>(null);
 
   const [wingOptions] = useState<SpaceshipPartOption[]>(initialWingOptions);
@@ -47,8 +63,39 @@ export default function AnpassaSkeppPage() {
   const [spaceshipImageUrl, setSpaceshipImageUrl] = useState<string | null>(null);
   const [isLoadingMainSpaceshipImage, setIsLoadingMainSpaceshipImage] = useState(false);
   const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState<string>("wings");
+
+  useEffect(() => {
+    const storedSpaceshipRaw = localStorage.getItem(SPACESHIP_STORAGE_KEY);
+    if (storedSpaceshipRaw) {
+      try {
+        const storedSpaceship: StoredSpaceship = JSON.parse(storedSpaceshipRaw);
+        setSpaceshipImageUrl(storedSpaceship.imageUrl);
+        setSelectedWings(storedSpaceship.parts.wing);
+        setSelectedEngine(storedSpaceship.parts.engine);
+        setSelectedDecoration(storedSpaceship.parts.decoration);
+      } catch (e) {
+        console.error("Failed to parse stored spaceship", e);
+        localStorage.removeItem(SPACESHIP_STORAGE_KEY);
+      }
+    } else {
+      // Set defaults if nothing is stored
+      setSelectedWings(initialWingOptions[0].id);
+      setSelectedEngine(initialEngineOptions[0].id);
+    }
+  }, []);
+
 
   const handleCreateSpaceshipImage = async () => {
+    if (!selectedWings || !selectedEngine) {
+      toast({
+        title: "Val Saknas",
+        description: "Välj åtminstone vingar och motor för ditt skepp.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoadingMainSpaceshipImage(true);
     setSpaceshipImageUrl(null);
 
@@ -60,15 +107,28 @@ export default function AnpassaSkeppPage() {
     Vingar: ${wingName}. 
     Motor: ${engineName}. 
     Dekoration: ${decorationName}. 
-    Stil: Enkel, cool tecknad stil, barnvänlig.`;
+    Stil: Enkel, cool tecknad stil, barnvänlig, rymdtema.`;
 
     try {
       const result = await generateImage({ prompt });
       setSpaceshipImageUrl(result.imageDataUri);
       toast({
         title: "Skepp Skapat!",
-        description: "Ditt unika rymdskepp är redo för äventyr!",
+        description: "Ditt unika rymdskepp är redo! Glöm inte att spara.",
       });
+
+      // Save to localStorage
+      const spaceshipToStore: StoredSpaceship = {
+        imageUrl: result.imageDataUri,
+        parts: {
+          wing: selectedWings,
+          engine: selectedEngine,
+          decoration: selectedDecoration,
+        },
+        partNames: { wingName, engineName, decorationName}
+      };
+      localStorage.setItem(SPACESHIP_STORAGE_KEY, JSON.stringify(spaceshipToStore));
+
     } catch (error) {
       console.error("Failed to generate main spaceship image:", error);
       toast({
@@ -112,7 +172,7 @@ export default function AnpassaSkeppPage() {
                 ) : (
                   <div className="text-center text-muted-foreground p-4">
                     <RocketIcon className="h-16 w-16 mx-auto mb-4 text-primary/50" />
-                    <p>Gör dina val nedan och klicka sedan på "Skapa Skepp"!</p>
+                    <p>Gör dina val nedan och klicka sedan på "Skapa Skepp & Spara Lokalt"!</p>
                   </div>
                 )}
               </CardContent>
@@ -120,26 +180,26 @@ export default function AnpassaSkeppPage() {
           </div>
 
           <div className="lg:col-span-2">
-            <Tabs defaultValue="wings" className="w-full">
+            <Tabs defaultValue="wings" className="w-full" onValueChange={setActiveTab}>
               <TabsList className="grid w-full grid-cols-3 bg-primary/20">
                 <TabsTrigger value="wings" className="text-xs sm:text-sm data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"><Orbit className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5" />Vingar</TabsTrigger>
                 <TabsTrigger value="engines" className="text-xs sm:text-sm data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"><Flame className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5" />Motorer</TabsTrigger>
                 <TabsTrigger value="decorations" className="text-xs sm:text-sm data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"><Palette className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5" />Dekor</TabsTrigger>
               </TabsList>
               <ScrollArea className="h-auto max-h-[calc(100vh-20rem)] lg:max-h-[60vh] mt-2 p-0.5">
-                <TabsContent value="wings">
+                <TabsContent value="wings" forceMount={activeTab === "wings"}>
                   <Card className="bg-card/70 backdrop-blur-sm border-0 shadow-none">
                     <CardHeader><CardTitle className="text-lg text-primary">Välj Vingar</CardTitle></CardHeader>
                     <CardContent>{renderOptionGrid(wingOptions, selectedWings, setSelectedWings)}</CardContent>
                   </Card>
                 </TabsContent>
-                <TabsContent value="engines">
+                <TabsContent value="engines" forceMount={activeTab === "engines"}>
                   <Card className="bg-card/70 backdrop-blur-sm border-0 shadow-none">
                     <CardHeader><CardTitle className="text-lg text-primary">Välj Motor</CardTitle></CardHeader>
                     <CardContent>{renderOptionGrid(engineOptions, selectedEngine, setSelectedEngine)}</CardContent>
                   </Card>
                 </TabsContent>
-                <TabsContent value="decorations">
+                <TabsContent value="decorations" forceMount={activeTab === "decorations"}>
                   <Card className="bg-card/70 backdrop-blur-sm border-0 shadow-none">
                     <CardHeader><CardTitle className="text-lg text-primary">Välj Dekoration</CardTitle></CardHeader>
                     <CardContent>{renderOptionGrid(decorationOptions, selectedDecoration, setSelectedDecoration)}</CardContent>
@@ -149,11 +209,11 @@ export default function AnpassaSkeppPage() {
             </Tabs>
             <Button 
               onClick={handleCreateSpaceshipImage} 
-              disabled={isLoadingMainSpaceshipImage} 
+              disabled={isLoadingMainSpaceshipImage || !selectedWings || !selectedEngine} 
               className="w-full font-semibold mt-6" 
               size="lg"
             >
-              {isLoadingMainSpaceshipImage ? <LoadingSpinner size="sm" /> : 'Skapa Skepp'}
+              {isLoadingMainSpaceshipImage ? <LoadingSpinner size="sm" /> : 'Skapa Skepp & Spara Lokalt'}
             </Button>
           </div>
         </div>
