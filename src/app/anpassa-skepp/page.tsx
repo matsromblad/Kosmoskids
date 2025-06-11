@@ -141,12 +141,16 @@ export default function AnpassaSkeppPage() {
         title: "Skeppshistoria Skapad!",
         description: "En unik historia för ditt skepp är klar.",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error generating spaceship backstory:", error);
       setSpaceshipBackstory("Ett fel uppstod när skeppets historia skulle skapas. Försök igen senare!");
+      let desc = "Kunde inte generera skeppshistoria. Försök igen om en liten stund.";
+      if (error.message && (error.message.includes("503") || error.message.toLowerCase().includes("overloaded"))) {
+        desc = "AI-tjänsten för att skapa historier verkar vara upptagen just nu. Prova igen om en liten stund!";
+      }
       toast({
-        title: "Fel",
-        description: "Kunde inte generera skeppshistoria.",
+        title: "Fel vid Skapande av Historia",
+        description: desc,
         variant: "destructive",
       });
     } finally {
@@ -269,11 +273,17 @@ export default function AnpassaSkeppPage() {
       }
 
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to generate spaceship name or image:", error);
+      let desc = "Kunde inte skapa namn eller bild för skeppet. Försök igen om en liten stund.";
+      if (error.message && (error.message.includes("503") || error.message.toLowerCase().includes("overloaded"))) {
+        desc = "AI-tjänsten för att skapa skepp verkar vara upptagen just nu. Prova igen om en liten stund!";
+      } else if (error.message && error.message.toLowerCase().includes("quota")) {
+        desc = "AI-tjänsten har nått sin kvot för idag. Prova igen imorgon!";
+      }
       toast({
-        title: "Fel vid skapande",
-        description: "Kunde inte skapa namn eller bild för skeppet.",
+        title: "Fel vid Skeppsskapande",
+        description: desc,
         variant: "destructive",
       });
     } finally {
@@ -407,3 +417,4 @@ export default function AnpassaSkeppPage() {
     </div>
   );
 }
+
