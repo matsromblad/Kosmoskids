@@ -1,6 +1,8 @@
+
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
+import HyperspaceBackground from '@/components/fx/HyperspaceBackground';
 
 export const metadata: Metadata = {
   title: 'Kosmoskids',
@@ -20,7 +22,10 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet" />
       </head>
       <body className="font-body antialiased min-h-screen flex flex-col">
-        {children}
+        <HyperspaceBackground />
+        <main className="flex-grow flex flex-col relative z-[1]">
+          {children}
+        </main>
         <Toaster />
       </body>
     </html>
