@@ -2,11 +2,13 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Users, Rocket, Globe2 } from 'lucide-react';
+import { Users, Rocket, Globe2, RotateCcw } from 'lucide-react';
 import Image from 'next/image';
 import { MainMenuButton } from '@/components/game/MainMenuButton';
 import { generateImage } from '@/ai/flows/generate-image-flow';
 import { LoadingSpinner } from '@/components/game/LoadingSpinner';
+import { Button } from '@/components/ui/button';
+import { useToast } from "@/hooks/use-toast";
 
 interface StoredCharacter {
   name: string;
@@ -40,6 +42,7 @@ export default function Home() {
   const [spaceshipData, setSpaceshipData] = useState<StoredSpaceship | null>(null);
   const [logoImageUrl, setLogoImageUrl] = useState<string | null>(null);
   const [isLoadingLogo, setIsLoadingLogo] = useState<boolean>(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     const storedCharacterRaw = localStorage.getItem(CHARACTER_STORAGE_KEY);
@@ -74,14 +77,25 @@ export default function Home() {
         })
         .catch(error => {
           console.error("Failed to generate logo image:", error);
-          // Fallback to a placeholder if generation fails
-          setLogoImageUrl("https://placehold.co/200x200/2E3192/FFFFFF.png?text=Kosmos");
+          setLogoImageUrl("https://placehold.co/200x200/2E3192/FFFFFF.png?text=Logo");
         })
         .finally(() => {
           setIsLoadingLogo(false);
         });
     }
   }, []);
+
+  const handleStartOver = () => {
+    localStorage.removeItem(CHARACTER_STORAGE_KEY);
+    localStorage.removeItem(SPACESHIP_STORAGE_KEY);
+    setCharacterData(null);
+    setSpaceshipData(null);
+    toast({
+      title: "Börjat Om!",
+      description: "Din varelse och ditt skepp har återställts.",
+      variant: "default"
+    });
+  };
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4 md:p-8 bg-gradient-to-br from-background to-indigo-900/50">
@@ -98,9 +112,9 @@ export default function Home() {
                   width={200}
                   height={200}
                   className="rounded-full object-contain"
+                  data-ai-hint="planet logo"
               />
             ) : (
-              // Fallback placeholder if everything fails
               <Image
                 src="https://placehold.co/200x200/2E3192/FFFFFF.png?text=Logo"
                 alt="Kosmoskids Logotyp Placeholder"
@@ -145,6 +159,13 @@ export default function Home() {
           className="bg-sky-500/30 hover:bg-sky-500/40 border-sky-400"
         />
       </main>
+
+      <div className="mt-10 w-full max-w-xs mx-auto">
+        <Button variant="outline" onClick={handleStartOver} className="w-full font-semibold border-accent hover:bg-accent/20 hover:text-accent-foreground">
+          <RotateCcw className="mr-2 h-5 w-5" />
+          Börja Om
+        </Button>
+      </div>
 
       <footer className="mt-12 text-center text-muted-foreground text-sm">
         <p>&copy; {new Date().getFullYear()} Kosmoskids. Alla rättigheter förbehållna.</p>
