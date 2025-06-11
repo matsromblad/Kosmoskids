@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Orbit, Flame, Palette, RocketIcon, Wand2, ArrowLeft } from 'lucide-react';
+import { Orbit, Flame, Palette, RocketIcon, Wand2, ArrowLeft, Edit3 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -12,6 +12,7 @@ import { GameHeader } from '@/components/layout/GameHeader';
 import { OptionCard } from '@/components/game/OptionCard';
 import { generateImage } from '@/ai/flows/generate-image-flow';
 import { generateSpaceshipBackstory, type GenerateSpaceshipBackstoryInput } from '@/ai/flows/generate-spaceship-backstory';
+import { generateSpaceshipName, type GenerateSpaceshipNameInput } from '@/ai/flows/generate-spaceship-name';
 import { LoadingSpinner } from '@/components/game/LoadingSpinner';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
@@ -23,6 +24,7 @@ interface SpaceshipPartOption {
 }
 
 interface StoredSpaceship {
+  name: string | null;
   imageUrl: string;
   backstory: string | null;
   style: string | null;
@@ -73,11 +75,13 @@ export default function AnpassaSkeppPage() {
   const [engineOptions] = useState<SpaceshipPartOption[]>(initialEngineOptions);
   const [decorationOptions] = useState<SpaceshipPartOption[]>(initialDecorationOptions);
 
+  const [spaceshipName, setSpaceshipName] = useState<string | null>(null);
   const [spaceshipImageUrl, setSpaceshipImageUrl] = useState<string | null>(null);
   const [isLoadingMainSpaceshipImage, setIsLoadingMainSpaceshipImage] = useState(false);
   const [selectedSpaceshipStyle, setSelectedSpaceshipStyle] = useState<string>(spaceshipStyles[0].value);
   const [spaceshipBackstory, setSpaceshipBackstory] = useState<string | null>(null);
   const [isLoadingSpaceshipBackstory, setIsLoadingSpaceshipBackstory] = useState(false);
+  const [isLoadingSpaceshipName, setIsLoadingSpaceshipName] = useState(false);
 
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<string>("wings");
@@ -87,6 +91,7 @@ export default function AnpassaSkeppPage() {
     if (storedSpaceshipRaw) {
       try {
         const storedSpaceship: StoredSpaceship = JSON.parse(storedSpaceshipRaw);
+        setSpaceshipName(storedSpaceship.name)
         setSpaceshipImageUrl(storedSpaceship.imageUrl);
         setSelectedWings(storedSpaceship.parts.wing);
         setSelectedEngine(storedSpaceship.parts.engine);
@@ -147,7 +152,7 @@ export default function AnpassaSkeppPage() {
     }
   };
 
-  const handleCreateSpaceshipImage = async () => {
+  const handleCreateSpaceship = async () => {
     if (!selectedWings || !selectedEngine) {
       toast({
         title: "Val Saknas",
@@ -158,32 +163,50 @@ export default function AnpassaSkeppPage() {
     }
 
     setIsLoadingMainSpaceshipImage(true);
+    setIsLoadingSpaceshipName(true); // Start loading name
     setSpaceshipImageUrl(null);
+    // setSpaceshipName(null); // Optionally clear old name
 
-    const wingName = wingOptions.find(opt => opt.id === selectedWings)?.name || "standardvingar";
-    const engineName = engineOptions.find(opt => opt.id === selectedEngine)?.name || "standardmotor";
-    const decorationName = decorationOptions.find(opt => opt.id === selectedDecoration)?.name || "inga dekorationer";
+    const wingNameStr = wingOptions.find(opt => opt.id === selectedWings)?.name || "standardvingar";
+    const engineNameStr = engineOptions.find(opt => opt.id === selectedEngine)?.name || "standardmotor";
+    const decorationNameStr = decorationOptions.find(opt => opt.id === selectedDecoration)?.name || "inga dekorationer";
     
-    let prompt = `Skapa en bild av ett rymdskepp. 
-    Vingar: ${wingName}. 
-    Motor: ${engineName}. 
-    Dekoration: ${decorationName}. 
-    Skeppets stil: ${selectedSpaceshipStyle}. `;
-    if (spaceshipBackstory) {
-      prompt += `Bakgrundshistoria: ${spaceshipBackstory}. `;
-    }
-    prompt += `Visuell stil: Enkel, cool tecknad stil, barnvänlig, rymdtema.`;
+    let currentSpaceshipName = spaceshipName;
 
     try {
-      const result = await generateImage({ prompt });
-      setSpaceshipImageUrl(result.imageDataUri);
+      // Generate name first
+      const nameInput: GenerateSpaceshipNameInput = {
+        spaceshipStyle: selectedSpaceshipStyle,
+        wingName: wingNameStr,
+        engineName: engineNameStr,
+        decorationName: decorationNameStr,
+      };
+      const nameResult = await generateSpaceshipName(nameInput);
+      currentSpaceshipName = nameResult.spaceshipName;
+      setSpaceshipName(currentSpaceshipName);
+      setIsLoadingSpaceshipName(false);
+
+      // Then generate image
+      let prompt = `Skapa en bild av ett rymdskepp vid namn "${currentSpaceshipName}".
+      Vingar: ${wingNameStr}.
+      Motor: ${engineNameStr}.
+      Dekoration: ${decorationNameStr}.
+      Skeppets stil: ${selectedSpaceshipStyle}. `;
+      if (spaceshipBackstory) {
+        prompt += `Bakgrundshistoria: ${spaceshipBackstory}. `;
+      }
+      prompt += `Visuell stil: Enkel, cool tecknad stil, barnvänlig, rymdtema.`;
+
+      const imageResult = await generateImage({ prompt });
+      setSpaceshipImageUrl(imageResult.imageDataUri);
       toast({
         title: "Skepp Skapat!",
-        description: "Ditt unika rymdskepp är redo! Det är sparat lokalt.",
+        description: `Ditt unika rymdskepp "${currentSpaceshipName}" är redo! Det är sparat lokalt.`,
       });
 
       const spaceshipToStore: StoredSpaceship = {
-        imageUrl: result.imageDataUri,
+        name: currentSpaceshipName,
+        imageUrl: imageResult.imageDataUri,
         backstory: spaceshipBackstory,
         style: selectedSpaceshipStyle,
         parts: {
@@ -191,19 +214,20 @@ export default function AnpassaSkeppPage() {
           engine: selectedEngine,
           decoration: selectedDecoration,
         },
-        partNames: { wingName, engineName, decorationName }
+        partNames: { wingName: wingNameStr, engineName: engineNameStr, decorationName: decorationNameStr }
       };
       localStorage.setItem(SPACESHIP_STORAGE_KEY, JSON.stringify(spaceshipToStore));
 
     } catch (error) {
-      console.error("Failed to generate main spaceship image:", error);
+      console.error("Failed to generate spaceship name or image:", error);
       toast({
-        title: "Fel vid bildgenerering",
-        description: "Kunde inte skapa bild för skeppet.",
+        title: "Fel vid skapande",
+        description: "Kunde inte skapa namn eller bild för skeppet.",
         variant: "destructive",
       });
     } finally {
       setIsLoadingMainSpaceshipImage(false);
+      setIsLoadingSpaceshipName(false);
     }
   };
 
@@ -228,17 +252,20 @@ export default function AnpassaSkeppPage() {
           <div className="lg:col-span-1 flex justify-center">
             <Card className="w-full max-w-md shadow-xl bg-card/80 backdrop-blur-sm">
               <CardHeader>
-                <CardTitle className="text-center text-2xl font-headline text-primary">Ditt Skepp</CardTitle>
+                <CardTitle className="text-center text-2xl font-headline text-primary flex items-center justify-center">
+                  {isLoadingSpaceshipName ? <LoadingSpinner size="sm" /> : (spaceshipName || "Ditt Skepp")}
+                   {!isLoadingSpaceshipName && !spaceshipName && <Edit3 className="ml-2 h-5 w-5 text-primary/70" />}
+                </CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col justify-center items-center p-6 min-h-[300px]">
                 {isLoadingMainSpaceshipImage ? (
                   <LoadingSpinner size="lg"/>
                 ) : spaceshipImageUrl ? (
-                  <Image src={spaceshipImageUrl} alt="Rymdskepp" width={400} height={300} className="rounded-lg object-contain shadow-lg border-2 border-primary" />
+                  <Image src={spaceshipImageUrl} alt={spaceshipName || "Rymdskepp"} width={400} height={300} className="rounded-lg object-contain shadow-lg border-2 border-primary" />
                 ) : (
                   <div className="text-center text-muted-foreground p-4">
                     <RocketIcon className="h-16 w-16 mx-auto mb-4 text-primary/50" />
-                    <p>Gör dina val, skapa en historia och klicka sedan på "Skapa Skepp"!</p>
+                    <p>Gör dina val och klicka sedan på "Skapa Skepp"!</p>
                   </div>
                 )}
               </CardContent>
@@ -252,7 +279,7 @@ export default function AnpassaSkeppPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <label htmlFor="spaceshipStyle" className="block text-sm font-medium text-muted-foreground mb-1">Välj stil för skeppets historia:</label>
+                  <label htmlFor="spaceshipStyle" className="block text-sm font-medium text-muted-foreground mb-1">Välj stil för skeppets historia & namn:</label>
                   <Select value={selectedSpaceshipStyle} onValueChange={setSelectedSpaceshipStyle}>
                     <SelectTrigger id="spaceshipStyle" className="w-full bg-input/50 border-border text-foreground">
                       <SelectValue placeholder="Välj en stil" />
@@ -309,12 +336,12 @@ export default function AnpassaSkeppPage() {
             </Tabs>
             <div className="flex flex-col sm:flex-row gap-4 mt-6">
               <Button 
-                onClick={handleCreateSpaceshipImage} 
-                disabled={isLoadingMainSpaceshipImage || isLoadingSpaceshipBackstory || !selectedWings || !selectedEngine} 
+                onClick={handleCreateSpaceship} 
+                disabled={isLoadingMainSpaceshipImage || isLoadingSpaceshipBackstory || isLoadingSpaceshipName || !selectedWings || !selectedEngine} 
                 className="w-full font-semibold" 
                 size="lg"
               >
-                {isLoadingMainSpaceshipImage ? <LoadingSpinner size="sm" /> : 'Skapa Skepp'}
+                {(isLoadingMainSpaceshipImage || isLoadingSpaceshipName) ? <LoadingSpinner size="sm" /> : 'Skapa Skepp'}
               </Button>
               <Button asChild variant="outline" size="lg" className="w-full font-semibold">
                 <Link href="/">

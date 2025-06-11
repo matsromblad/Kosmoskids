@@ -9,6 +9,8 @@ import { generateImage } from '@/ai/flows/generate-image-flow';
 import { LoadingSpinner } from '@/components/game/LoadingSpinner';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 
 interface StoredCharacter {
   name: string;
@@ -18,6 +20,7 @@ interface StoredCharacter {
 }
 
 interface StoredSpaceship {
+  name: string | null;
   imageUrl: string;
   backstory: string | null;
   style: string | null;
@@ -77,7 +80,7 @@ export default function Home() {
         })
         .catch(error => {
           console.error("Failed to generate logo image:", error);
-          setLogoImageUrl("https://placehold.co/200x200/2E3192/FFFFFF.png?text=Logo");
+          setLogoImageUrl("https://placehold.co/200x200/2E3192/FFFFFF.png?text=Kosmos");
         })
         .finally(() => {
           setIsLoadingLogo(false);
@@ -96,6 +99,8 @@ export default function Home() {
       variant: "default"
     });
   };
+  
+  const canExplore = !!characterData?.imageUrl && !!spaceshipData?.imageUrl;
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4 md:p-8 bg-gradient-to-br from-background to-indigo-900/50">
@@ -116,7 +121,7 @@ export default function Home() {
               />
             ) : (
               <Image
-                src="https://placehold.co/200x200/2E3192/FFFFFF.png?text=Logo"
+                src="https://placehold.co/200x200/2E3192/FFFFFF.png?text=Kosmos"
                 alt="Kosmoskids Logotyp Placeholder"
                 width={200}
                 height={200}
@@ -147,25 +152,52 @@ export default function Home() {
           href="/anpassa-skepp"
           icon={!spaceshipData?.imageUrl ? Rocket : undefined}
           title="Mitt Skepp"
-          description={spaceshipData?.imageUrl ? "Visa och anpassa ditt rymdskepp." : "Bygg och designa ditt drömrymdskepp."}
+          description={spaceshipData?.name ? `Visa och anpassa ${spaceshipData.name}.` : (spaceshipData?.imageUrl ? "Visa och anpassa ditt rymdskepp." : "Bygg och designa ditt drömrymdskepp.")}
           className="bg-pink-500/30 hover:bg-pink-500/40 border-pink-400"
           imageUrl={spaceshipData?.imageUrl}
+          spaceshipName={spaceshipData?.name}
         />
-        <MainMenuButton
-          href="/rymdkarta"
-          icon={Globe2}
-          title="Utforska"
-          description="Upptäck planeter och ge dig ut på äventyr."
-          className="bg-sky-500/30 hover:bg-sky-500/40 border-sky-400"
-        />
+        
+        {canExplore ? (
+          <MainMenuButton
+            href="/rymdkarta"
+            icon={Globe2}
+            title="Utforska"
+            description="Upptäck planeter och ge dig ut på äventyr."
+            className="bg-sky-500/30 hover:bg-sky-500/40 border-sky-400"
+          />
+        ) : (
+          <TooltipProvider delayDuration={100}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                {/* The div wrapper is necessary for TooltipTrigger asChild when the child might be complex or disabled */}
+                <div className={cn("rounded-lg", !canExplore && "opacity-60 cursor-not-allowed grayscale-[50%]")}>
+                   <MainMenuButton
+                    href="/rymdkarta" 
+                    icon={Globe2}
+                    title="Utforska"
+                    description="Upptäck planeter och ge dig ut på äventyr."
+                    className={cn("bg-sky-500/30 border-sky-400", !canExplore && "pointer-events-none")}
+                    disabled={!canExplore}
+                  />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>Du måste skapa både en varelse och ett rymdskepp innan du kan utforska!</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
       </main>
 
-      <div className="mt-10 w-full max-w-xs mx-auto">
-        <Button variant="outline" onClick={handleStartOver} className="w-full font-semibold border-accent hover:bg-accent/20 hover:text-accent-foreground">
-          <RotateCcw className="mr-2 h-5 w-5" />
-          Börja Om
-        </Button>
-      </div>
+      {(characterData || spaceshipData) && (
+        <div className="mt-10 w-full max-w-xs mx-auto">
+            <Button variant="outline" onClick={handleStartOver} className="w-full font-semibold border-accent hover:bg-accent/20 hover:text-accent-foreground">
+            <RotateCcw className="mr-2 h-5 w-5" />
+            Börja Om
+            </Button>
+        </div>
+      )}
 
       <footer className="mt-12 text-center text-muted-foreground text-sm">
         <p>&copy; {new Date().getFullYear()} Kosmoskids. Alla rättigheter förbehållna.</p>
