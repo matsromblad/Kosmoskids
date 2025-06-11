@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Award } from 'lucide-react';
 import { LoadingSpinner } from '@/components/game/LoadingSpinner';
 import { useToast } from "@/hooks/use-toast"; 
+import { getRandomUniqueElements } from '@/lib/utils';
 
 interface PlanetDefinition {
   id: string;
@@ -112,14 +113,6 @@ const PLANET_IMAGES_KEY = "kosmoskids_planet_images";
 const VISITED_PLANETS_KEY = "kosmoskids_visited_planets";
 const NUMBER_OF_ACTIVE_PLANETS = 4;
 
-function getRandomUniqueElements<T>(arr: T[], numElements: number): T[] {
-  if (numElements > arr.length) {
-    console.warn(`Requested ${numElements} unique elements, but array only has ${arr.length}. Returning all elements shuffled.`);
-     return [...arr].sort(() => 0.5 - Math.random());
-  }
-  const shuffled = [...arr].sort(() => 0.5 - Math.random());
-  return shuffled.slice(0, numElements);
-}
 
 export default function RymdkartaPage() {
   const [activePlanetDefinitions, setActivePlanetDefinitions] = useState<PlanetDefinition[]>([]);
@@ -128,9 +121,11 @@ export default function RymdkartaPage() {
   const { toast } = useToast();
   const currentlyFetchingRef = useRef<Set<string>>(new Set());
 
+  // Effect for initial setup: determining active planets and loading from localStorage
   useEffect(() => {
     const storedActivePlanetIdsRaw = localStorage.getItem(ACTIVE_PLANET_IDS_KEY);
     let currentActivePlanetIds: string[] = [];
+    let newPlanetsSelected = false;
 
     if (storedActivePlanetIdsRaw) {
       try {
@@ -153,8 +148,10 @@ export default function RymdkartaPage() {
       currentActivePlanetIds = selectedPlanetDefinitions.map(p => p.id);
       try {
         localStorage.setItem(ACTIVE_PLANET_IDS_KEY, JSON.stringify(currentActivePlanetIds));
+        // Crucial: Reset images and visited status if the set of active planets changes
         localStorage.removeItem(PLANET_IMAGES_KEY); 
         localStorage.removeItem(VISITED_PLANETS_KEY);
+        newPlanetsSelected = true; // Flag that we've selected new planets
       } catch (e) {
         console.error("Error setting new active planet IDs in localStorage", e);
          toast({
@@ -169,83 +166,91 @@ export default function RymdkartaPage() {
       .map(id => allPlanetDefinitions.find(p => p.id === id))
       .filter(p => p !== undefined) as PlanetDefinition[];
 
-    const initialPlanetStates = resolvedDefinitions.map(pDef => ({
-        ...pDef,
-        imageUrl: `https://placehold.co/300x200/2E3192/FFFFFF.png?text=${encodeURIComponent(pDef.name)}`,
-        isLoadingImage: true, // Will be updated based on localStorage later
-        isVisited: false, // Will be updated based on localStorage later
-    }));
+    let storedPlanetImages: Record<string, string> = {};
+    // If new planets were selected, we should not try to load old images.
+    // The PLANET_IMAGES_KEY was already removed.
+    if (!newPlanetsSelected) {
+        const storedPlanetImagesRaw = localStorage.getItem(PLANET_IMAGES_KEY);
+        if (storedPlanetImagesRaw) {
+          try {
+            storedPlanetImages = JSON.parse(storedPlanetImagesRaw);
+          } catch (e) {
+            console.error("Failed to parse stored planet images, will attempt to regenerate.", e);
+            localStorage.removeItem(PLANET_IMAGES_KEY); 
+          }
+        }
+    }
+    
+    let storedVisitedPlanets: string[] = [];
+    // If new planets were selected, visited status is also reset.
+    // The VISITED_PLANETS_KEY was already removed.
+    if (!newPlanetsSelected) {
+        const storedVisitedPlanetsRaw = localStorage.getItem(VISITED_PLANETS_KEY);
+        if (storedVisitedPlanetsRaw) {
+          try {
+            storedVisitedPlanets = JSON.parse(storedVisitedPlanetsRaw);
+          } catch (e) {
+            console.error("Failed to parse stored visited planets.", e);
+            localStorage.removeItem(VISITED_PLANETS_KEY); 
+          }
+        }
+    }
+
+    const initialPlanetStates = resolvedDefinitions.map(pDef => {
+        const existingImageUrl = storedPlanetImages[pDef.id];
+        return {
+            ...pDef,
+            imageUrl: existingImageUrl || `https://placehold.co/300x200/2E3192/FFFFFF.png?text=${encodeURIComponent(pDef.name)}`,
+            isLoadingImage: !existingImageUrl, // isLoadingImage is true ONLY if no image was found in storage.
+            isVisited: storedVisitedPlanets.includes(pDef.id),
+        };
+    });
     
     setActivePlanetDefinitions(initialPlanetStates);
     setIsLoadingDefinitions(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []); // This effect should run once on mount to set up the initial state.
 
-  useEffect(() => {
-    if (isLoadingDefinitions || activePlanetDefinitions.length === 0) return;
-
-    let storedPlanetImages: Record<string, string> = {};
-    const storedPlanetImagesRaw = localStorage.getItem(PLANET_IMAGES_KEY);
-    if (storedPlanetImagesRaw) {
-      try {
-        storedPlanetImages = JSON.parse(storedPlanetImagesRaw);
-      } catch (e) {
-        console.error("Failed to parse stored planet images, will attempt to regenerate.", e);
-        localStorage.removeItem(PLANET_IMAGES_KEY); 
-      }
-    }
-    
-    let storedVisitedPlanets: string[] = [];
-    const storedVisitedPlanetsRaw = localStorage.getItem(VISITED_PLANETS_KEY);
-    if (storedVisitedPlanetsRaw) {
-      try {
-        storedVisitedPlanets = JSON.parse(storedVisitedPlanetsRaw);
-      } catch (e) {
-        console.error("Failed to parse stored visited planets.", e);
-        localStorage.removeItem(VISITED_PLANETS_KEY); 
-      }
-    }
-
-    setActivePlanetDefinitions(prevDefs => {
-      return prevDefs.map(pDef => {
-        const isVisited = storedVisitedPlanets.includes(pDef.id);
-        const existingImageUrl = storedPlanetImages[pDef.id];
-        return {
-          ...pDef,
-          imageUrl: existingImageUrl || pDef.imageUrl, 
-          isLoadingImage: !existingImageUrl, 
-          isVisited: isVisited,
-        };
-      });
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoadingDefinitions]); 
-
+  // Effect for fetching images if they are marked as isLoadingImage: true
   useEffect(() => {
     if (isLoadingDefinitions || activePlanetDefinitions.length === 0) return;
 
     const fetchImagesSequentially = async () => {
-      let storedPlanetImagesMap: Record<string, string> = {};
-      const mapRaw = localStorage.getItem(PLANET_IMAGES_KEY);
+      let currentStoredImagesMap: Record<string, string> = {};
+      const mapRaw = localStorage.getItem(PLANET_IMAGES_KEY); // Get the most current map from localStorage
        if (mapRaw) {
         try {
-          storedPlanetImagesMap = JSON.parse(mapRaw);
+          currentStoredImagesMap = JSON.parse(mapRaw);
         } catch (e) {
-          console.error("Failed to parse storedPlanetImagesMap in fetchImagesSequentially, resetting.", e);
-          storedPlanetImagesMap = {}; 
+          console.error("Failed to parse currentStoredImagesMap in fetchImagesSequentially, resetting.", e);
+          currentStoredImagesMap = {}; 
         }
       }
       
       for (const planetData of activePlanetDefinitions) {
-        if (planetData.isLoadingImage && !storedPlanetImagesMap[planetData.id] && !currentlyFetchingRef.current.has(planetData.id)) {
+        // Only fetch if isLoadingImage is true AND it's not already being fetched
+        if (planetData.isLoadingImage && !currentlyFetchingRef.current.has(planetData.id)) {
+          // As an extra safeguard, if an image for this planet somehow exists in currentStoredImagesMap
+          // (e.g. fetched by a previous incomplete run), update state and skip fetching.
+          if (currentStoredImagesMap[planetData.id]) {
+            setActivePlanetDefinitions(prevs =>
+              prevs.map(p =>
+                p.id === planetData.id
+                  ? { ...p, imageUrl: currentStoredImagesMap[planetData.id], isLoadingImage: false }
+                  : p
+              )
+            );
+            continue; // Already in localStorage, skip.
+          }
+
           try {
             currentlyFetchingRef.current.add(planetData.id);
             const result = await generateImage({ prompt: planetData.imageHint });
             
-            storedPlanetImagesMap[planetData.id] = result.imageDataUri;
+            currentStoredImagesMap[planetData.id] = result.imageDataUri; // Add new image to our map
             
             try {
-              localStorage.setItem(PLANET_IMAGES_KEY, JSON.stringify(storedPlanetImagesMap));
+              localStorage.setItem(PLANET_IMAGES_KEY, JSON.stringify(currentStoredImagesMap));
             } catch (e: any) {
               if (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
                 console.warn(`Quota exceeded for PLANET_IMAGES_KEY. Image for ${planetData.name} might not be persisted.`, e.message);
@@ -293,13 +298,6 @@ export default function RymdkartaPage() {
           } finally {
             currentlyFetchingRef.current.delete(planetData.id);
           }
-        } else if (planetData.isLoadingImage && storedPlanetImagesMap[planetData.id]) {
-           // If image was in localStorage from the start of this effect run, but state wasn't updated yet
-           setActivePlanetDefinitions(prevs =>
-              prevs.map(p =>
-                p.id === planetData.id ? { ...p, imageUrl: storedPlanetImagesMap[planetData.id], isLoadingImage: false } : p
-              )
-            );
         }
       }
     };
@@ -338,7 +336,7 @@ export default function RymdkartaPage() {
     }
   };
 
-  if (isLoadingDefinitions && activePlanetDefinitions.length === 0) { // Ensure we show loading if definitions are truly loading AND not yet populated
+  if (isLoadingDefinitions && activePlanetDefinitions.length === 0) { 
     return (
       <div className="min-h-screen flex flex-col bg-gradient-to-br from-background to-indigo-900/50">
         <GameHeader title="Laddar Rymdkarta..." />
@@ -405,6 +403,8 @@ export default function RymdkartaPage() {
     </div>
   );
 }
+    
+
     
 
     
