@@ -231,14 +231,14 @@ export default function AnpassaVarelsePage() {
     const accessoryNameStr = accessoryOptions.find(opt => opt.id === selectedAccessory)?.name || allAccessoryOptionsGlobal.find(opt => opt.id === selectedAccessory)?.name || "inga tillbehör";
 
 
-    let prompt = `Skapa en bild av en rymdvarelse vid namn ${currentName}. Varelsen är ${selectedCharacterStyle.toLowerCase()}. `;
+    let prompt = `En rymdvarelse vid namn ${currentName}. Varelsen är ${selectedCharacterStyle.toLowerCase()}. `;
     prompt += `Klädsel: ${clothingNameStr}. `;
     prompt += `Frisyr: ${hairstyleNameStr}. `;
     prompt += `Tillbehör: ${accessoryNameStr}. `;
     if (generatedBackstory) {
       prompt += `Bakgrundshistoria: ${generatedBackstory}. `;
     }
-    prompt += `Stil: Enkel, söt tecknad stil, glad och barnvänlig, rymdtema.`;
+    // Global style will be appended by generateImageFlow
 
     try {
       const imageResult = await generateImage({ prompt }); 

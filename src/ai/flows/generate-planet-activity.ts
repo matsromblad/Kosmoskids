@@ -18,13 +18,12 @@ const GeneratePlanetActivityInputSchema = z.object({
   characterStyle: z.string().describe('The chosen style for the space character (e.g., Sportig, Nördig).'),
   characterBackstory: z.string().optional().describe('The backstory of the character.'),
   spaceshipName: z.string().optional().describe('The name of the character\'s spaceship.'),
-  // spaceshipStyle: z.string().optional().describe('The style of the spaceship.'), // Might be too much detail
 });
 export type GeneratePlanetActivityInput = z.infer<typeof GeneratePlanetActivityInputSchema>;
 
 const GeneratePlanetActivityOutputSchema = z.object({
   activityText: z.string().describe("En kort (2-4 meningar), rolig och barnvänlig berättelse på svenska om vad rymdvarelsen {{{characterName}}} gör på planeten {{{planetName}}}. Anpassa berättelsen till karaktärens stil och bakgrund, samt planetens egenskaper."),
-  imagePrompt: z.string().describe("En detaljerad prompt för att generera en bild som illustrerar aktiviteten. Bilden ska vara i en glad, färgstark och barnvänlig tecknad stil, och visa {{{characterName}}} på {{{planetName}}}. Inkludera detaljer från berättelsen."),
+  imagePrompt: z.string().describe("En detaljerad BESKRIVNING AV SCENEN för att generera en bild som illustrerar aktiviteten. Bilden ska visa {{{characterName}}} på {{{planetName}}}. Inkludera detaljer från berättelsen. SPECIFICERA INTE BILDSTIL, det hanteras separat."),
 });
 export type GeneratePlanetActivityOutput = z.infer<typeof GeneratePlanetActivityOutputSchema>;
 
@@ -52,12 +51,12 @@ Stil: {{{characterStyle}}}
 
 Baserat på detta, skapa:
 1.  **activityText**: En berättelse om vad {{{characterName}}} gör på {{{planetName}}}. Gör det lekfullt och spännande! Inkludera gärna något som relaterar till karaktärens stil eller bakgrund.
-2.  **imagePrompt**: En prompt för att generera en bild till berättelsen. Beskriv scenen, {{{characterName}}}s utseende och handling, samt viktiga element från {{{planetName}}}. Stilen ska vara "glad, färgstark, detaljerad och barnvänlig tecknad stil, rymdtema".
+2.  **imagePrompt**: En prompt som ENDAST beskriver scenen för en bild till berättelsen. Beskriv {{{characterName}}}s utseende och handling, samt viktiga element från {{{planetName}}}. Specificera INTE någon konstnärlig stil (t.ex. "tecknad stil", "färgstark") i denna prompt, då det hanteras separat. Fokusera på VAD som ska visas.
 
 Exempel på output-format (men med anpassat innehåll):
 {
   "activityText": "Rymd-Zoe, den äventyrliga utforskaren, landade sitt skepp 'Kometen' mjukt på Lavaplaneten Volcanis. Hon hoppade genast ut och började samla glödande lavastenar, nynnandes på en rymdvisa. En liten Flammis vinkade glatt från en närliggande vulkan!",
-  "imagePrompt": "En glad tecknad bild av rymdvarelsen Rymd-Zoe (sportig stil, kanske med coola glasögon) som plockar färgglada, glödande lavastenar på planeten Volcanis. Hennes rymdskepp 'Kometen' syns i bakgrunden. En liten, vänlig, orange Flammis-figur vinkar från en tecknad vulkan. Ljusa färger, detaljerad, barnvänlig rymdillustration."
+  "imagePrompt": "Rymdvarelsen Rymd-Zoe (sportig stil, kanske med coola glasögon) plockar färgglada, glödande lavastenar på planeten Volcanis. Hennes rymdskepp 'Kometen' syns i bakgrunden. En liten, vänlig, orange Flammis-figur vinkar från en vulkan."
 }
 `,
 });

@@ -12,7 +12,7 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const GenerateImageInputSchema = z.object({
-  prompt: z.string().describe('The textual prompt for image generation.'),
+  prompt: z.string().describe('The textual prompt for image generation, describing the scene or subject.'),
 });
 export type GenerateImageInput = z.infer<typeof GenerateImageInputSchema>;
 
@@ -25,6 +25,10 @@ export async function generateImage(input: GenerateImageInput): Promise<Generate
   return generateImageFlow(input);
 }
 
+// Admin-anpassningsbar global bildstil. Ändra denna sträng för att påverka stilen på alla genererade bilder.
+const GLOBAL_IMAGE_STYLE_PROMPT = "Visuell stil: En glad, färgstark och detaljerad tecknad stil, barnvänlig, för ett rymdäventyr för barn. Generera inga bokstäver eller text i bilden.";
+
+
 const generateImageFlow = ai.defineFlow(
   {
     name: 'generateImageFlow',
@@ -32,9 +36,11 @@ const generateImageFlow = ai.defineFlow(
     outputSchema: GenerateImageOutputSchema,
   },
   async (input) => {
+    const fullPrompt = `${input.prompt.trim()} ${GLOBAL_IMAGE_STYLE_PROMPT}`;
+    
     const {media} = await ai.generate({
       model: 'googleai/gemini-2.0-flash-exp',
-      prompt: input.prompt,
+      prompt: fullPrompt,
       config: {
         responseModalities: ['TEXT', 'IMAGE'],
       },
@@ -46,3 +52,4 @@ const generateImageFlow = ai.defineFlow(
     return { imageDataUri: media.url };
   }
 );
+

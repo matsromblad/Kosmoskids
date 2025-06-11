@@ -249,7 +249,7 @@ export default function AnpassaSkeppPage() {
       setIsLoadingSpaceshipBackstory(false);
     }
       
-    let prompt = `Skapa en bild av ett rymdskepp vid namn "${currentSpaceshipName}".
+    let prompt = `Ett rymdskepp vid namn "${currentSpaceshipName}".
     Vingar: ${wingNameStr}.
     Motor: ${engineNameStr}.
     Dekoration: ${decorationNameStr}.
@@ -257,7 +257,7 @@ export default function AnpassaSkeppPage() {
     if (generatedBackstory) {
       prompt += `Bakgrundshistoria: ${generatedBackstory}. `;
     }
-    prompt += `Visuell stil: Enkel, cool tecknad stil, barnvänlig, rymdtema.`;
+    // Global style will be appended by generateImageFlow
 
     try {
       const imageResult = await generateImage({ prompt });
