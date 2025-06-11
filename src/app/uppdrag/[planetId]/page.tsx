@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, use } from 'react'; // Added 'use'
 import Image from 'next/image';
 import Link from 'next/link';
 import { GameHeader } from '@/components/layout/GameHeader';
@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { 
   generatePlanetActivity, 
   type GeneratePlanetActivityInput,
-  type GeneratePlanetActivityOutput 
+  // type GeneratePlanetActivityOutput // Not used directly
 } from '@/ai/flows/generate-planet-activity';
 import { generateImage } from '@/ai/flows/generate-image-flow';
 
@@ -59,13 +59,13 @@ const planetDetails: Record<string, { name: string; description: string }> = {
 
 
 interface PlanetMissionPageProps {
-  params: {
+  params: Promise<{ // params is a Promise
     planetId: string;
-  };
+  }>;
 }
 
 export default function PlanetMissionPage({ params }: PlanetMissionPageProps) {
-  const { planetId } = params;
+  const { planetId } = use(params); // Use React.use() to unwrap params
   const currentPlanetInfo = planetDetails[planetId] || { name: planetId, description: "En okänd plats i rymden..." };
 
   const [character, setCharacter] = useState<StoredCharacter | null>(null);
@@ -213,3 +213,4 @@ export default function PlanetMissionPage({ params }: PlanetMissionPageProps) {
     </div>
   );
 }
+
