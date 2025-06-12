@@ -1,7 +1,7 @@
 
 'use server';
 /**
- * @fileOverview Generates an image based on a textual prompt.
+ * @fileOverview Generates an image based on a textual prompt, optionally using a base image.
  *
  * - generateImage - A function that calls the image generation flow.
  * - GenerateImageInput - The input type for the generateImage function.
@@ -13,6 +13,7 @@ import {z} from 'genkit';
 
 const GenerateImageInputSchema = z.object({
   prompt: z.string().describe('The textual prompt for image generation, describing the scene or subject.'),
+  baseImageDataUri: z.string().optional().describe('Optional base image as a data URI to guide the generation (image-to-image). Expected format: \'data:<mimetype>;base64,<encoded_data>\'.'),
 });
 export type GenerateImageInput = z.infer<typeof GenerateImageInputSchema>;
 
@@ -36,11 +37,20 @@ const generateImageFlow = ai.defineFlow(
     outputSchema: GenerateImageOutputSchema,
   },
   async (input) => {
-    const fullPrompt = `${input.prompt.trim()} ${GLOBAL_IMAGE_STYLE_PROMPT}`;
+    const fullPromptText = `${input.prompt.trim()} ${GLOBAL_IMAGE_STYLE_PROMPT}`;
+    
+    let modelPrompt: string | Array<{text?: string; media?: {url: string}}> = fullPromptText;
+
+    if (input.baseImageDataUri) {
+      modelPrompt = [
+        { media: { url: input.baseImageDataUri } },
+        { text: fullPromptText }
+      ];
+    }
     
     const {media} = await ai.generate({
       model: 'googleai/gemini-2.0-flash-exp',
-      prompt: fullPrompt,
+      prompt: modelPrompt,
       config: {
         responseModalities: ['TEXT', 'IMAGE'],
       },
@@ -52,4 +62,3 @@ const generateImageFlow = ai.defineFlow(
     return { imageDataUri: media.url };
   }
 );
-

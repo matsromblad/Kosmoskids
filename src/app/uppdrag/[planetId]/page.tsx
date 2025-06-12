@@ -168,7 +168,14 @@ export default function PlanetMissionPage({ params }: PlanetMissionPageProps) {
   useEffect(() => {
     const storedCharacterRaw = localStorage.getItem(CHARACTER_STORAGE_KEY);
     if (storedCharacterRaw) {
-      setCharacter(JSON.parse(storedCharacterRaw));
+      try {
+        setCharacter(JSON.parse(storedCharacterRaw));
+      } catch (e) {
+        console.error("Failed to parse stored character:", e);
+        setErrorState("Kunde inte ladda din rymdvarelse. Gå tillbaka och skapa en först!");
+        setIsLoadingContent(false);
+        return;
+      }
     } else {
       setErrorState("Ingen rymdvarelse hittades. Gå tillbaka och skapa en först!");
       setIsLoadingContent(false);
@@ -177,7 +184,14 @@ export default function PlanetMissionPage({ params }: PlanetMissionPageProps) {
 
     const storedSpaceshipRaw = localStorage.getItem(SPACESHIP_STORAGE_KEY);
      if (storedSpaceshipRaw) {
-      setSpaceship(JSON.parse(storedSpaceshipRaw));
+      try {
+        setSpaceship(JSON.parse(storedSpaceshipRaw));
+      } catch (e) {
+         console.error("Failed to parse stored spaceship:", e);
+         setErrorState("Kunde inte ladda ditt rymdskepp. Gå tillbaka och skapa ett först!");
+         setIsLoadingContent(false);
+         return;
+      }
     } else {
       setErrorState("Inget rymdskepp hittades. Gå tillbaka och skapa ett först!");
       setIsLoadingContent(false);
@@ -199,7 +213,7 @@ export default function PlanetMissionPage({ params }: PlanetMissionPageProps) {
           planetDescription: currentPlanetDetails.description,
           characterName: character.name,
           characterStyle: character.style,
-          characterBackstory: character.backstory,
+          characterBackstory: character.backstory || undefined,
           spaceshipName: spaceship.name || undefined,
         };
 
@@ -207,7 +221,11 @@ export default function PlanetMissionPage({ params }: PlanetMissionPageProps) {
         setActivityText(activityResult.activityText);
 
         if (activityResult.imagePrompt && activityResult.imagePrompt.trim() !== "") {
-          const imageResult = await generateImage({ prompt: activityResult.imagePrompt });
+          const imageGenInput = { 
+            prompt: activityResult.imagePrompt,
+            baseImageDataUri: character.imageUrl // Pass character image as base
+          };
+          const imageResult = await generateImage(imageGenInput);
           setActivityImageUrl(imageResult.imageDataUri);
         } else {
            console.warn(`Image prompt was empty for planet ${currentPlanetDetails.name}. Using placeholder.`);
@@ -219,19 +237,41 @@ export default function PlanetMissionPage({ params }: PlanetMissionPageProps) {
           });
         }
         
-        const visitedPlanets: string[] = JSON.parse(localStorage.getItem(VISITED_PLANETS_STORAGE_KEY) || '[]');
+        let visitedPlanets: string[] = [];
+        const visitedPlanetsRaw = localStorage.getItem(VISITED_PLANETS_STORAGE_KEY);
+        if (visitedPlanetsRaw) {
+            try {
+                visitedPlanets = JSON.parse(visitedPlanetsRaw);
+            } catch (e) {
+                console.error("Failed to parse visited planets from localStorage", e);
+                localStorage.removeItem(VISITED_PLANETS_STORAGE_KEY); // Clear corrupted data
+            }
+        }
+        
         if (!visitedPlanets.includes(planetId)) {
           visitedPlanets.push(planetId);
-          localStorage.setItem(VISITED_PLANETS_STORAGE_KEY, JSON.stringify(visitedPlanets));
+          try {
+            localStorage.setItem(VISITED_PLANETS_STORAGE_KEY, JSON.stringify(visitedPlanets));
+          } catch (e) {
+             console.error("Failed to save visited planets to localStorage", e);
+             // Optionally inform user if saving visited status fails, though it's less critical than main content
+          }
         }
         toast({ title: "Uppdrag Utfört!", description: `Du har nu utforskat ${currentPlanetDetails.name}.` });
 
-      } catch (err) {
+      } catch (err: any) {
         console.error("Failed to generate planet activity or image:", err);
-        setErrorState("Kunde inte ladda äventyret. Försök gå tillbaka och komma hit igen.");
+        let toastDescription = "Kunde inte generera innehåll för planeten. Det kan bero på ett tillfälligt problem med AI-tjänsten.";
+        if (err.message && (err.message.includes("503") || err.message.toLowerCase().includes("overloaded"))){
+            toastDescription = `AI-tjänsten för ${currentPlanetDetails.name} är tillfälligt överbelastad. Prova igen om en stund.`;
+        } else if (err.message && err.message.toLowerCase().includes("quota")){
+            toastDescription = `AI-tjänsten har nått sin kvot för idag för ${currentPlanetDetails.name}. Prova igen imorgon.`;
+        }
+        
+        setErrorState(`Kunde inte ladda äventyret: ${toastDescription}`);
         toast({
           title: "Ett fel uppstod",
-          description: "Kunde inte generera innehåll för planeten. Det kan bero på ett tillfälligt problem med AI-tjänsten.",
+          description: toastDescription,
           variant: "destructive",
         });
       } finally {
@@ -241,7 +281,7 @@ export default function PlanetMissionPage({ params }: PlanetMissionPageProps) {
 
     fetchActivity();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [character, spaceship, planetId, currentPlanetDetails.name, currentPlanetDetails.description]);
+  }, [character, spaceship, planetId, currentPlanetDetails.name, currentPlanetDetails.description, toast]); // Added toast to dependencies
 
   const pageTitle = currentPlanetDetails ? `Äventyr på ${currentPlanetDetails.name}` : "Laddar Äventyr...";
 
