@@ -68,7 +68,11 @@ const generatePlanetActivityFlow = ai.defineFlow(
     outputSchema: GeneratePlanetActivityOutputSchema,
   },
   async input => {
-    const {output} = await prompt(input);
-    return output!;
+    const result = await prompt(input);
+    if (!result.output) {
+      console.error(`AI prompt '${prompt.name}' failed to produce output. Input: ${JSON.stringify(input)}. Result details:`, result);
+      throw new Error(`AI model ('${prompt.name}') failed to produce valid output. Finish reason: ${result.finishReason}.`);
+    }
+    return result.output;
   }
 );
